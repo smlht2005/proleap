@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "generatedAt": "2026-02-11 15:50:56",
+    "sourceFile": "HRRCB1IF.cbl",
+    "parser": "ANTLR4 Cobol85Acu (C#)",
+    "parseTimeMs": 460.6543
+  },
+  "overview": {
+    "fdCount": 0,
+    "dataItem01Count": 0,
+    "dataItem77Count": 0,
+    "totalDataItems": 0,
+    "sectionCount": 0,
+    "paragraphCount": 0,
+    "statementCount": 0,
+    "hasScreenSection": true,
+    "screenSectionItemCount": 0,
+    "fileControlEntryCount": 0
+  },
+  "ast": {
+    "fdCount": 0,
+    "dataItem01Count": 0,
+    "dataItem77Count": 0,
+    "totalDataItems": 0,
+    "sectionCount": 0,
+    "paragraphCount": 0,
+    "statementCount": 0,
+    "hasScreenSection": true,
+    "screenSectionItemCount": 0,
+    "fileControlEntryCount": 0
+  }
+}

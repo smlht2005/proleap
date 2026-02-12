@@ -1,0 +1,31 @@
+# .NET / C#
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.cache
+packages/
+*.dll
+*.pdb
+
+# Java / Maven
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build / output
+*.log
+diagnostic_log*.txt
+
+# ANTLR generated (optional; remove if you want to track generated parsers)
+# ConvertCobol/Generated/
+# ConvertCobol/obj/

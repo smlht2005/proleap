@@ -1,0 +1,81 @@
+grammar ACUCOBOL;
+
+program: IDENTIFICATION DIVISION? PROGRAM_ID SECTION_NAME '.' dataDivision procedureDivision;
+
+IDENTIFICATION: 'IDENTIFICATION';
+DIVISION: 'DIVISION';
+PROGRAM_ID: 'PROGRAM-ID';
+SECTION_NAME: [A-Z][A-Z0-9-]*; // COBOL section names can have hyphens
+
+dataDivision: DATA DIVISION '.' workingStorageSection? fileSection? linkageSection?;
+DATA: 'DATA';
+WORKING_STORAGE: 'WORKING-STORAGE';
+FILE: 'FILE';
+
+workingStorageSection: WORKING_STORAGE SECTION '.' variableDeclaration+;
+
+variableDeclaration: VAR_NAME PIC_TYPE PIC_FORMAT (VALUE value)? (REDEFINES VAR_NAME)? (OCCURS NUMBER TIMES)? '.';
+VAR_NAME: [A-Za-z0-9-]+; // COBOL allows hyphens in variable names
+PIC_TYPE: 'PIC';
+
+// Expanded PIC_FORMAT rule
+PIC_FORMAT: '(' PIC_STRING ')' | PIC_STRING;
+
+PIC_STRING: (PIC_CHAR | PIC_REPETITION)+;
+PIC_CHAR: 'A' | 'X' | '9' | 'Z' | '$' | '.' | ',' | '/' | '*' | '+' | '-' | 'B' | 'P' | 'V' | 'S' | // Common PIC characters
+          'COMP' | 'COMP-1' | 'COMP-2' | 'COMP-3' | 'COMP-4' | 'COMP-5' | 'BINARY' | 'DISPLAY' | // Data types
+          'USAGE DISPLAY' | 'USAGE COMP' | 'USAGE COMP-1' | 'USAGE COMP-2' | 'USAGE COMP-3' | 'USAGE COMP-4' | 'USAGE COMP-5' | 'USAGE BINARY'; // Usage clauses
+PIC_REPETITION: PIC_CHAR '(' NUMBER ')';
+
+VALUE: 'VALUE' (STRING_LITERAL | NUMBER | constant);
+constant: 'ZERO' | 'ZEROS' | 'SPACE' | 'SPACES' | 'HIGH-VALUE' | 'HIGH-VALUES' | 'LOW-VALUE' | 'LOW-VALUES' | 'QUOTE' | 'QUOTES';
+
+REDEFINES: 'REDEFINES';
+OCCURS: 'OCCURS';
+TIMES: 'TIMES';
+
+fileSection: FILE SECTION '.' fileDescription+;
+fileDescription: 'FD' VAR_NAME '.' recordDeclaration+;
+recordDeclaration: VAR_NAME PIC_TYPE PIC_FORMAT '.'; // Same PIC_FORMAT as variableDeclaration
+
+linkageSection: 'LINKAGE SECTION' '.' variableDeclaration+;
+
+procedureDivision: PROCEDURE DIVISION '.' paragraph+;
+PROCEDURE: 'PROCEDURE';
+
+paragraph: paragraphName '.' sentence+;
+paragraphName: [A-Z][A-Z0-9-]*; // Paragraph names can have hyphens
+
+sentence: statement+ '.';
+
+statement: moveStatement | displayStatement | sqlStatement | callStatement | stopStatement | ifStatement | performStatement | fileStatement | gobackStatement | copyStatement | computeStatement | stringStatement | acceptStatement;
+
+moveStatement: 'MOVE' (value | VAR_NAME) 'TO' VAR_NAME (',' VAR_NAME)* '.';
+displayStatement: 'DISPLAY' (value | VAR_NAME) (',' (value | VAR_NAME))* '.';
+sqlStatement: 'EXEC' 'SQL' (sqlConnect | sqlQuery) 'END-EXEC' '.';
+sqlConnect: 'CONNECT TO' STRING_LITERAL 'AS' VAR_NAME;
+sqlQuery: (('SELECT'|'INSERT'|'UPDATE'|'DELETE') .*?) ; // Still very broad, consider a separate SQL grammar
+callStatement: 'CALL' (STRING_LITERAL | VAR_NAME) ('USING' VAR_NAME+)? '.';
+stopStatement: 'STOP' 'RUN' '.';
+gobackStatement: 'GOBACK' '.';
+ifStatement: 'IF' condition 'THEN' sentence+ ('ELSE' sentence+)? 'END-IF' '.';
+performStatement: 'PERFORM' (paragraphName | VAR_NAME) (TIMES NUMBER)? (VARYING ...)? '.'; // PERFORM can be more complex (THRU, VARYING)
+fileStatement: ('OPEN' | 'CLOSE' | 'READ' | 'WRITE' | 'REWRITE' | 'START') VAR_NAME ('AT END' sentence+)? '.';
+copyStatement: 'COPY' FILENAME (REPLACING ...)? '.'; // COPY can have REPLACING clauses
+computeStatement: 'COMPUTE' VAR_NAME '=' expression '.';
+stringStatement: 'STRING' (value | VAR_NAME)+ 'DELIMITED BY' (value | VAR_NAME) 'INTO' VAR_NAME ('WITH POINTER' VAR_NAME)? '.';
+acceptStatement: 'ACCEPT' VAR_NAME (FROM ...)? '.';
+
+condition: (VAR_NAME | '(' condition ')')  (('='|'<'|'>'|'<='|'>='|'NOT ='|'IS' 'NUMERIC'|'IS' 'ALPHABETIC'|'IS' 'ALPHANUMERIC'|'AND'|'OR') (value | VAR_NAME | '(' condition ')'))*;
+
+expression: term (('+'|'-') term)*;
+term: factor (('*'|'/') factor)*;
+factor: (value | VAR_NAME | '(' expression ')');
+
+
+value: STRING_LITERAL | NUMBER;
+STRING_LITERAL: '"' [^"]* '"'; // Allow more characters in string literals (anything but a quote)
+NUMBER: [0-9]+;
+FILENAME: '"' [A-Za-z0-9_.-]+ '"'; // Consider allowing more characters in filenames
+
+WS: [ \t\r\n]+ -> skip;

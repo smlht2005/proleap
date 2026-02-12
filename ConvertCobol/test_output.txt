@@ -1,0 +1,13 @@
+﻿C:\Development\HISCore\proleap\ConvertCobol\ConvertCobol.csproj : warning NU1603: ConvertCobol 靘陷 Antlr4BuildTasks (>= 12.5.1)嚗??曆???Antlr4BuildTasks 12.5.1?歇?寧閫?? Antlr4BuildTasks 12.6.0??
+C:\Development\HISCore\proleap\ConvertCobol\ConvertCobol.csproj : warning NU1603: ConvertCobol 靘陷 Antlr4BuildTasks (>= 12.5.1)嚗??曆???Antlr4BuildTasks 12.5.1?歇?寧閫?? Antlr4BuildTasks 12.6.0??
+C:\Development\HISCore\proleap\ConvertCobol\Visitors\CobolAstVisitor.cs(380,34): warning CS8602: ?航 null ????(dereference)??[C:\Development\HISCore\proleap\ConvertCobol\ConvertCobol.csproj]
+C:\Development\HISCore\proleap\ConvertCobol\Visitors\CobolAstVisitor.cs(1022,21): error CS0136: ?⊥??冽迨蝭?摰??? 'levelStr' ?????豢??嚗??箄府?迂撌脩?澆??亙????貊???隞亙?蝢拙????豢?? [C:\Development\HISCore\proleap\ConvertCobol\ConvertCobol.csproj]
+C:\Development\HISCore\proleap\ConvertCobol\Visitors\CobolAstVisitor.cs(1040,21): error CS0136: ?⊥??冽迨蝭?摰??? 'levelStr' ?????豢??嚗??箄府?迂撌脩?澆??亙????貊???隞亙?蝢拙????豢?? [C:\Development\HISCore\proleap\ConvertCobol\ConvertCobol.csproj]
+dotnet : 
+位於 C:\Users\hungtao.liu\AppData\Local\Temp\ps-script-cd5e982a-8598-401e-80fe-3a74726120d0.ps1:101 字元:49
++ ... nvertCobol; dotnet run -- ast list/HRRCB1IF.lst ast/HRRCB1IF_ast.json ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+撱箇蔭憭望???靽格迤撱箇蔭?航炊敺??銵?甈～?

@@ -1,0 +1,1150 @@
+# COBOL AST Report: Unknown
+
+> 產生時間: 2026-02-11 14:44:12
+> 原始檔案: `HRRCB1IF.cbl`
+> 解析工具: ANTLR4 Cobol85Acu (C#)
+> 解析耗時: 474 ms
+
+## 概覽
+
+| 項目 | 數值 |
+|------|------|
+| PROGRAM-ID | - |
+| FD 項目 | 0 |
+| 01-Level 資料項目 | 0 |
+| 77-Level 資料項目 | 0 |
+| 全部資料項目 | 0 |
+| Sections | 0 |
+| Paragraphs | 195 |
+| 語句總數 | 1478 |
+| 含 SCREEN SECTION（已註解） | 是 |
+
+## IDENTIFICATION DIVISION
+
+- **PROGRAM-ID**: `-`
+
+## ENVIRONMENT DIVISION
+
+- 已辨識
+
+## DATA DIVISION
+
+### FILE SECTION (0 FD)
+
+
+## PROCEDURE DIVISION
+
+#### Acu-Main-Logic
+
+- PERFORM: 3
+
+#### Acu-Extended-File-Status
+
+- CALL: 2
+- MOVE: 1
+- PERFORM: 1
+
+#### Acu-Show-Msg
+
+- MOVE: 1
+- EVALUATE: 1
+- PERFORM: 1
+
+#### Acu-Message-Box
+
+- MOVE: 2
+- IF: 1
+- INSPECT: 1
+
+#### Acu-Initial-Routine
+
+- ACCEPT: 2
+- PERFORM: 1
+
+#### Acu-Init-Font
+
+- SET: 14
+- MOVE: 4
+- INITIALIZE: 2
+- CALL: 2
+
+#### Acu-Exit-Rtn
+
+- EXIT: 1
+- STOP: 1
+
+#### Acu-S-RCB1-Routine
+
+- PERFORM: 2
+
+#### Acu-S-HT-DATA-Routine
+
+- PERFORM: 2
+
+#### Acu-S-RCB1-Scrn
+
+- PERFORM: 2
+
+#### Acu-S-HT-DATA-Scrn
+
+- PERFORM: 2
+
+#### Acu-S-RCB1-Create-Win
+
+- PERFORM: 1
+- DISPLAY: 1
+
+#### Acu-S-HT-DATA-Create-Win
+
+- DISPLAY: 1
+
+#### Acu-S-RCB1-Init-Data
+
+- PERFORM: 2
+
+#### Acu-S-HT-DATA-Init-Data
+
+- PERFORM: 1
+
+#### Acu-S-RCB1-Proc
+
+- PERFORM: 1
+- DESTROY: 1
+- INITIALIZE: 1
+
+#### Acu-S-HT-DATA-Proc
+
+- PERFORM: 1
+- DESTROY: 1
+- INITIALIZE: 1
+
+#### Acu-S-RCB1-Gd-1-Content
+
+- MODIFY: 10
+
+#### Acu-S-RCB1-Evaluate-Func
+
+- EVALUATE: 1
+- MOVE: 1
+
+#### Acu-S-HT-DATA-Evaluate-Func
+
+- EVALUATE: 1
+- MOVE: 1
+
+#### Acu-S-RCB1-Exit
+
+- SET: 1
+
+#### Acu-S-HT-DATA-Exit
+
+- SET: 1
+
+#### Acu-S-RCB1-Mn-1-Menu
+
+- PERFORM: 1
+
+#### Acu-S-RCB1-Mn-1
+
+- CALL: 3
+- IF: 2
+
+#### Acu-S-RCB1-Mn-1-Exit
+
+- MOVE: 1
+
+#### S-RCB1-Exception-Proc
+
+- PERFORM: 1
+
+#### S-RCB1-Gd-1-Event-Proc
+
+- EVALUATE: 1
+
+#### S-HT-DATA-Exception-Proc
+
+- IF: 1
+
+#### F-RCB1-Bef-Create
+
+- MOVE: 15
+- IF: 7
+- ACCEPT: 5
+- PERFORM: 2
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-RCB1-Aft-Create
+
+- PERFORM: 1
+
+#### F-RCB1-Aft-Initdata
+
+- PERFORM: 2
+- MOVE: 2
+- MODIFY: 1
+- EVALUATE: 1
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-RCB1-Ex-Other
+
+- PERFORM: 1
+- EVALUATE: 1
+- MODIFY: 1
+- INQUIRE: 1
+- IF: 1
+
+#### F-RCB-RTN
+
+- PERFORM: 3
+- DISPLAY: 1
+- IF: 1
+
+#### F-STOP-RTN
+
+- IF: 1
+- INITIALIZE: 1
+- MOVE: 1
+- CALL: 1
+- PERFORM: 1
+- EVALUATE: 1
+- DESTROY: 1
+
+#### F-HRIBGCF-MOVE-QQ
+
+- MOVE: 6
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Begin-Entry
+
+- PERFORM: 2
+- SET: 1
+- IF: 1
+- MODIFY: 1
+- INQUIRE: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Begin-Drag
+
+- SET: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Goto-Cell
+
+- IF: 1
+- PERFORM: 1
+
+#### F-COLOR-RTN
+
+- MODIFY: 2
+
+#### F-RCB1-Gd-1-Ev-Msg-Goto-Cell-Mouse
+
+- MOVE: 1
+- PERFORM: 1
+
+#### F-TOP-TITLE
+
+- EVALUATE: 1
+
+#### F-IPDIF-RTN
+
+- INITIALIZE: 1
+- CALL: 1
+- IF: 1
+
+#### F-IPDNO-RTN
+
+- MOVE: 12
+- DISPLAY: 5
+- INITIALIZE: 4
+- IF: 4
+- READ: 3
+- CALL: 1
+- EVALUATE: 1
+- START: 1
+
+#### F-IPDNO-END
+
+- EXIT: 1
+
+#### F-HTICB2BF-NOTE-RTN
+
+- MOVE: 5
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-HTICB2BF-NOTE-END
+
+- EXIT: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Paged-Prev
+
+- PERFORM: 1
+- IF: 1
+- OTHER: 1
+- MOVE: 1
+- MODIFY: 1
+- SET: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Paged-Next
+
+- PERFORM: 1
+- IF: 1
+- ADD: 1
+- MOVE: 1
+- MODIFY: 1
+- SET: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Paged-Nextpage
+
+- PERFORM: 2
+- SET: 1
+
+#### F-RCB1-Gd-1-Ev-Msg-Paged-Prevpage
+
+- PERFORM: 2
+- SET: 1
+
+#### F-HT-DATA-Ex-Cmd-Close
+
+- PERFORM: 1
+
+#### F-HT-DATA-Aft-Initdata
+
+- PERFORM: 1
+
+#### S-HT-DATA-Ex-Other
+
+- PERFORM: 1
+
+#### F-CHK-FORM-RTN
+
+- MODIFY: 3
+- PERFORM: 3
+- MOVE: 3
+- EVALUATE: 1
+
+#### F-SHOW-FORM1-RTN
+
+- MODIFY: 9
+- CALL: 8
+- PERFORM: 1
+
+#### F-SHOW-FORM2-RTN
+
+- CALL: 8
+- MODIFY: 7
+- PERFORM: 1
+- IF: 1
+
+#### F-SHOW-FORM3-RTN
+
+- CALL: 8
+- MODIFY: 5
+- PERFORM: 1
+
+#### F-FUN-RTN
+
+- PERFORM: 1
+- INITIALIZE: 1
+- EVALUATE: 1
+
+#### F-FUN-EXIT
+
+- EXIT: 1
+
+#### F-MESG1-RTN
+
+- INITIALIZE: 1
+- IF: 1
+
+#### F-MESG2-RTN
+
+- INITIALIZE: 1
+- MOVE: 1
+- PERFORM: 1
+
+#### F-MESG3-RTN
+
+- INITIALIZE: 1
+- IF: 1
+
+#### F-IPLIF-RTN
+
+- INITIALIZE: 2
+- MOVE: 1
+- CALL: 1
+
+#### F-PICB-RTN
+
+- MOVE: 2
+- PERFORM: 1
+- IF: 1
+
+#### F-CHK-ECB1-RTN
+
+- MOVE: 2
+- PERFORM: 2
+- INITIALIZE: 1
+- IF: 1
+
+#### F-CHK-ECB2-RTN
+
+- MOVE: 2
+- PERFORM: 2
+- INITIALIZE: 1
+
+#### F-STARTS-RTN
+
+- START: 1
+- MOVE: 1
+
+#### F-STARTG-RTN
+
+- START: 1
+- MOVE: 1
+
+#### F-READN-RTN
+
+- IF: 2
+- READ: 1
+- MOVE: 1
+
+#### F-READN-EXIT
+
+- EXIT: 1
+
+#### F-999-RTN
+
+- PERFORM: 2
+- INITIALIZE: 1
+- MODIFY: 1
+- MOVE: 1
+
+#### F-LOAD-GRID-RTN
+
+- MOVE: 24
+- IF: 10
+- INITIALIZE: 6
+- PERFORM: 4
+- READ: 2
+- EVALUATE: 1
+- STRING: 1
+- INSPECT: 1
+- START: 1
+- MODIFY: 1
+- ADD: 1
+
+#### F-GET-STATUS
+
+- MOVE: 7
+- IF: 2
+- INITIALIZE: 1
+- READ: 1
+
+#### F-GET-STATUS1
+
+- IF: 3
+- MOVE: 2
+- READ: 1
+
+#### F-MOVE-CHK-DATA
+
+- MOVE: 10
+- INITIALIZE: 1
+- READ: 1
+- IF: 1
+
+#### F-MOVE-INQ-TITLE
+
+- MOVE: 16
+- IF: 8
+- ACCEPT: 5
+- MODIFY: 2
+- STRING: 1
+
+#### F-QTY-RTN
+
+- MOVE: 3
+- INITIALIZE: 1
+- PERFORM: 1
+
+#### F-CALL-HRDOSERF-RTN
+
+- IF: 1
+- CALL: 1
+
+#### F-ADD-RTB-QTY
+
+- INITIALIZE: 1
+- IF: 1
+
+#### F-DIVI-RTN
+
+- OTHER: 1
+- IF: 1
+
+#### F-SCREEN-DOWN
+
+- IF: 1
+
+#### F-SCREEN-UP
+
+- IF: 4
+- PERFORM: 3
+- MOVE: 2
+- OTHER: 1
+- MODIFY: 1
+- INQUIRE: 1
+- COMPUTE: 1
+- INITIALIZE: 1
+
+#### F-SEARCH-IPLIF-RTN
+
+- INITIALIZE: 1
+- MOVE: 1
+- CALL: 1
+- IF: 1
+
+#### F-SEARCH-RTN
+
+- EVALUATE: 1
+
+#### F-SEARCH-1-RTN
+
+- IF: 1
+
+#### F-SEARCH-2-RTN
+
+- IF: 1
+
+#### F-SEARCH-3-RTN
+
+- IF: 1
+
+#### F-DEL-RTN
+
+- IF: 1
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-END-MESG
+
+- INITIALIZE: 1
+- MOVE: 1
+- PERFORM: 1
+
+#### F-F5-PRINT-RTN
+
+- IF: 1
+
+#### F-PRINT-RTN
+
+- INITIALIZE: 2
+- MOVE: 2
+- READ: 1
+- IF: 1
+
+#### F-REPORT-RTN
+
+- IF: 1
+
+#### F-CALL-HTPATRPF
+
+- MOVE: 2
+- INITIALIZE: 2
+- CALL: 1
+- CANCEL: 1
+- IF: 1
+
+#### F-HT-DATA-RTN
+
+- MOVE: 19
+- INITIALIZE: 2
+- READ: 1
+- IF: 1
+- DISPLAY: 1
+
+#### F-DELETE-RTN
+
+- IF: 1
+
+#### F-HT-DELETE-RTN
+
+- MOVE: 6
+- IF: 5
+- PERFORM: 1
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-HT-DELETE-EXIT
+
+- EXIT: 1
+
+#### F-HT-DELETE-RTN2
+
+- MOVE: 12
+- IF: 5
+- INITIALIZE: 3
+- PERFORM: 2
+- CALL: 1
+
+#### F-CHK-DEL-RTN
+
+- MOVE: 4
+- INITIALIZE: 2
+- READ: 2
+- IF: 2
+- DISPLAY: 1
+- GOTO: 1
+
+#### F-CHK-DEL-EXIT
+
+- EXIT: 1
+
+#### F-HT-DELETE-RTN3
+
+- PERFORM: 1
+- INITIALIZE: 1
+- MOVE: 1
+- READ: 1
+- IF: 1
+
+#### F-DEL-LNK-RTN
+
+- INITIALIZE: 1
+- MOVE: 1
+- START: 1
+- READ: 1
+- PERFORM: 1
+
+#### F-DEL-LNK-RTN1
+
+- IF: 1
+- READ: 1
+
+#### F-DEL-SCH-RTN
+
+- MOVE: 23
+- INITIALIZE: 5
+- READ: 4
+- IF: 2
+- PERFORM: 2
+- ADD: 1
+- CALL: 1
+- CANCEL: 1
+
+#### F-WRITE-GCB-MI-RTN
+
+- MOVE: 2
+- INITIALIZE: 1
+- START: 1
+- READ: 1
+- PERFORM: 1
+
+#### F-WRITE-GCB-MI-RTN1
+
+- MOVE: 3
+- READ: 2
+- INITIALIZE: 1
+- PERFORM: 1
+
+#### F-REWRITE-ICA-RTN
+
+- MOVE: 2
+- INITIALIZE: 1
+- START: 1
+- READ: 1
+- IF: 1
+
+#### F-DELETE-FNS-RTN
+
+- IF: 2
+- INITIALIZE: 1
+
+#### F-WRITE-HRDTB-RTN
+
+- MOVE: 9
+- ADD: 1
+- IF: 1
+- INITIALIZE: 1
+- WRITE: 1
+
+#### F-WRITE-HRDTA-RTN
+
+- MOVE: 20
+- IF: 6
+- ACCEPT: 5
+- PERFORM: 1
+- INITIALIZE: 1
+- WRITE: 1
+
+#### F-READ-RNUJ-RTN
+
+- MOVE: 2
+- IF: 2
+- INITIALIZE: 1
+- READ: 1
+- ADD: 1
+- WRITE: 1
+
+#### F-READ-RNUJ-EXIT
+
+- EXIT: 1
+
+#### F-BEFORE-RTN
+
+- MOVE: 3
+
+#### F-AFTER-RTN
+
+- MOVE: 14
+- INITIALIZE: 4
+- READ: 3
+- CALL: 1
+- EVALUATE: 1
+- DISPLAY: 1
+
+#### F-DEL-ANN-MST
+
+- PERFORM: 1
+- IF: 1
+- EXIT: 1
+
+#### F-READ-ANN-MST
+
+- MOVE: 3
+- INITIALIZE: 1
+- READ: 1
+
+#### F-OPEN-RTN
+
+- INITIALIZE: 57
+- PERFORM: 51
+- MOVE: 50
+- OPEN: 47
+- IF: 10
+
+#### F-OPEN-EXIT
+
+- EXIT: 1
+
+#### F-HT-OPEN
+
+- PERFORM: 4
+- MOVE: 2
+- IF: 2
+- INITIALIZE: 1
+- OPEN: 1
+- READ: 1
+- CLOSE: 1
+
+#### F-CLOSE-RTN
+
+- PERFORM: 52
+- CLOSE: 49
+
+#### F-CLOSE-EXIT
+
+- EXIT: 1
+
+#### F-HT-CLOSE
+
+- PERFORM: 3
+- IF: 1
+
+#### F-HT-CLOSE1
+
+- PERFORM: 9
+- CLOSE: 9
+
+#### F-HT-CLOSE2
+
+- PERFORM: 12
+- CLOSE: 12
+
+#### F-INIT-RTN
+
+- INITIALIZE: 2
+- EVALUATE: 1
+
+#### F-INIT-EXIT
+
+- EXIT: 1
+
+#### F-FORM-TITLE
+
+- EVALUATE: 1
+- DISPLAY: 1
+
+#### F-NID-1000
+
+- MOVE: 2
+- INITIALIZE: 1
+- READ: 1
+- IF: 1
+
+#### F-NID-1099
+
+- MOVE: 2
+- INITIALIZE: 1
+- READ: 1
+- IF: 1
+
+#### F-NID-1198
+
+- MOVE: 4
+- INITIALIZE: 2
+- READ: 2
+- IF: 2
+
+#### F-NID-1799
+
+- MOVE: 2
+- INITIALIZE: 1
+- READ: 1
+- IF: 1
+
+#### F-CHK-LOG-RTN
+
+- MOVE: 2
+- INITIALIZE: 1
+- CALL: 1
+- IF: 1
+
+#### F-CHK-LOG-EXIT
+
+- EXIT: 1
+
+#### F-CATCH-SEL-RTN
+
+- IF: 1
+
+#### F-PACK-RTN
+
+- IF: 1
+
+#### F-MOVE-WK-NAME-RTN
+
+- MOVE: 1
+
+#### F-MOVE-WK-NAME-EXIT
+
+- EXIT: 1
+
+#### F-EXIT-RTN
+
+- MOVE: 4
+- INITIALIZE: 1
+- CALL: 1
+- IF: 1
+
+#### F-START-HRDTB-RTN
+
+- IF: 3
+- START: 1
+
+#### F-START-HRDTB-EXIT
+
+- EXIT: 1
+
+#### F-READ-TEST-RTN
+
+- IF: 2
+- PERFORM: 1
+- INITIALIZE: 1
+- MOVE: 1
+
+#### F-READ-TEST-EXIT
+
+- EXIT: 1
+
+#### F-READ-HRDTB-RTN
+
+- PERFORM: 1
+
+#### F-READ-HRDTB-EXIT
+
+- EXIT: 1
+
+#### F-READ-HIECB-RTN
+
+- MOVE: 2
+- PERFORM: 1
+- MODIFY: 1
+
+#### F-READ-HIECB-EXIT
+
+- EXIT: 1
+
+#### F-MOVE-GRID-RTN
+
+- MOVE: 8
+- IF: 5
+- INITIALIZE: 4
+- READ: 3
+- MODIFY: 1
+- ADD: 1
+
+#### F-MOVE-GRID-EXIT
+
+- EXIT: 1
+
+#### F-DEL-TO-WRITE-HRUDL3-RTN
+
+- MOVE: 57
+- ACCEPT: 6
+- IF: 6
+- INITIALIZE: 1
+- WRITE: 1
+
+#### F-WRT-LOG2-RTN
+
+- MOVE: 25
+- ACCEPT: 6
+- IF: 6
+- COMPUTE: 2
+- INITIALIZE: 1
+- ADD: 1
+- WRITE: 1
+
+#### F-WRT-LOG2-EXIT
+
+- EXIT: 1
+
+#### F-CHK-LOCK-RTN
+
+- INITIALIZE: 1
+- IF: 1
+- MOVE: 1
+- CALL: 1
+
+#### F-CHK-LOCK-EXIT
+
+- EXIT: 1
+
+#### F-READ-ELC-SETTING
+
+- MOVE: 3
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-OPEN-ELC-TRN
+
+- INITIALIZE: 1
+- IF: 1
+- EXIT: 1
+
+#### F-CLOSE-ELC-TRN
+
+- INITIALIZE: 1
+- IF: 1
+- EXIT: 1
+
+#### F-WRITE-ELC-TRN-11
+
+- IF: 1
+- EXIT: 1
+
+#### F-WRITE-ELC-TRN-21
+
+- PERFORM: 2
+
+#### F-WRITE-ELC-TRN-211
+
+- IF: 1
+- EXIT: 1
+
+#### F-WRITE-ELC-TRN-41
+
+- IF: 1
+- EXIT: 1
+
+#### F-WRITE-GCA-OLD-RTN
+
+- MOVE: 7
+- INITIALIZE: 1
+- WRITE: 1
+
+#### F-WRITE-GCA-OLD-EXIT
+
+- EXIT: 1
+
+#### F-WRITE-GCA-NEW-RTN
+
+- MOVE: 8
+- INITIALIZE: 1
+- WRITE: 1
+
+#### F-WRITE-GCA-NEW-EXIT
+
+- EXIT: 1
+
+#### F-WRITE-GCB-RTN
+
+- MOVE: 14
+- INITIALIZE: 1
+- WRITE: 1
+
+#### F-WRITE-GCB-EXIT
+
+- EXIT: 1
+
+#### F-ADD-MT-RTN
+
+- ADD: 1
+
+#### F-ADD-MT-EXIT
+
+- EXIT: 1
+
+#### F-SEARCH-DPT-RTN
+
+- IF: 2
+
+#### F-SEARCH-DR-RTN
+
+- IF: 2
+
+#### F-DEP-RTN
+
+- INITIALIZE: 2
+- MOVE: 2
+- START: 1
+- READ: 1
+- PERFORM: 1
+
+#### F-DR-RTN
+
+- INITIALIZE: 2
+- MOVE: 2
+- START: 1
+- READ: 1
+- PERFORM: 1
+
+#### F-OPEN-MESG
+
+- MOVE: 3
+- INITIALIZE: 2
+
+#### F-CLOSE-MESG
+
+- MOVE: 4
+- INITIALIZE: 1
+
+#### F-WIN-CLOCK
+
+- DISPLAY: 1
+
+#### F-CLOSE-WIN-CLOCK
+
+- SET: 2
+- IF: 1
+- CALL: 1
+- DESTROY: 1
+
+#### F-CLOCK
+
+- DISPLAY: 1
+- PERFORM: 1
+- MOVE: 1
+- MODIFY: 1
+
+#### F-BIRD
+
+- DISPLAY: 1
+- PERFORM: 1
+- MOVE: 1
+- MODIFY: 1
+
+#### F-LOAD-BAR
+
+- DISPLAY: 1
+- PERFORM: 1
+- MOVE: 1
+- MODIFY: 1
+
+#### F-COMPUTE-CLOCK-PERCENT-RTN
+
+- IF: 1
+
+#### F-ERR-NOTE
+
+- MOVE: 3
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-ERR-NOTE-2
+
+- MOVE: 3
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-ERR-NOTE-8
+
+- MOVE: 3
+- INITIALIZE: 1
+- CALL: 1
+
+#### F-OICA-RTN
+
+- OPEN: 1
+- IF: 1
+- INITIALIZE: 1
+
+#### F-OICA-EXIT
+
+- EXIT: 1
+
+#### F-OICB-RTN
+
+- OPEN: 1
+- IF: 1
+- INITIALIZE: 1
+
+#### F-OICB-EXIT
+
+- EXIT: 1
+
+#### F-OK-NOTE
+
+- PERFORM: 3
+- MOVE: 2
+- CALL: 1
+
+#### F-WAR-NOTE
+
+- PERFORM: 2
+- MOVE: 2
+
+#### F-BLANK
+
+- PERFORM: 1
+
+#### F-DIS-DEL-MSG
+
+- INITIALIZE: 1
+- MOVE: 1
+- PERFORM: 1
+
+#### F-DIS-WRT-MSG
+
+- INITIALIZE: 1
+- MOVE: 1
+- PERFORM: 1
+
+#### F-CREATE-HRSTATUS-RTN
+
+- DISPLAY: 1
+
+#### F-DISPLAY-HRSTATUS-RTN
+
+- MODIFY: 1
+
+#### F-CLEAR-HRSTATUS-RTN
+
+- INITIALIZE: 2
+- MOVE: 1
+- PERFORM: 1
+
