@@ -36,7 +36,9 @@ ConvertCobol/
 │       ├── DisplayStatement.cs
 │       └── ... (12 more)
 ├── CodeGen/
-│   └── ProcedureToCSharpEmitter.cs  # PROCEDURE -> C# code gen
+│   ├── ProcedureToCSharpEmitter.cs      # PROCEDURE -> C# code gen
+│   ├── ProcedureToPseudoCodeEmitter.cs  # PROCEDURE -> pseudo code
+│   └── ProcedureToMermaidEmitter.cs     # PROCEDURE -> Mermaid flowchart
 ├── Preprocessing/
 │   ├── CommentNormalizer.cs    # Traditional comment conversion
 │   └── EncodingHelper.cs      # Multi-encoding detection
@@ -93,10 +95,15 @@ dotnet run -- read output_ast.json
 ```
 ConvertCobol ast <input.lst|input.cbl> [output.md|output.json] [charset] [procedure.cs] [--verbose]
 ConvertCobol read <input.json>
+ConvertCobol emit <input_proc.json> [output] [--format pseudo|mermaid|both]
 ```
 
 - `ast` - Parse COBOL and produce AST report (JSON or Markdown based on extension)
 - `read` - Load JSON AST and display summary
+- `emit` - Convert procedure JSON to pseudo code and/or Mermaid flowchart
+  - `--format pseudo` - Output structured pseudo code only
+  - `--format mermaid` - Output Mermaid flowchart only
+  - `--format both` (default) - Output both pseudo code and Mermaid flowchart
 - `--verbose` / `-v` - Enable diagnostic logging (trace-level)
 - Default charset: `big5`
 - Environment variables: `CONVERTCOBOL_AST_INPUT`, `CONVERTCOBOL_AST_OUTPUT`, `CONVERTCOBOL_AST_CHARSET`

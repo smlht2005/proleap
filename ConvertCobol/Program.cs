@@ -24,7 +24,7 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 if (args.Length < 1)
 {
     Console.WriteLine("用法:");
-    Console.WriteLine("  ConvertCobol ast <input.lst|input.cbl> [output.md|output.json] [charset] [procedure.cs]");
+    Console.WriteLine("  ConvertCobol ast <input.lst|input.cbl> [output.md|output.json] [charset] [procedure.cs] [--verbose]");
     Console.WriteLine("  ConvertCobol read <input.json>");
     Console.WriteLine("  ConvertCobol emit <input_proc.json> [output] [--format pseudo|mermaid|both]");
     Console.WriteLine("  ast   - 產生 AST 報告（副檔名 .json 則輸出 JSON，否則 Markdown）");

@@ -19,14 +19,28 @@ public class ProcedureToMermaidEmitter
         var paragraphs = procedureDivision.Children.OfType<ParagraphNode>().ToList();
         var edges = new List<(string From, string To)>();
         var allNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var paragraphNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // First pass: collect all paragraph names
         foreach (var para in paragraphs)
         {
             allNames.Add(para.Name);
+            paragraphNames.Add(para.Name);
+        }
+
+        // Second pass: collect PERFORM targets and build edges
+        foreach (var para in paragraphs)
+        {
             var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             CollectPerformTargets(para.Statements, targets);
             foreach (var target in targets)
-                edges.Add((para.Name, target));
+            {
+                // Canonicalize target to existing paragraph name (case-insensitive)
+                var canonicalTarget = paragraphNames.FirstOrDefault(
+                    n => string.Equals(n, target, StringComparison.OrdinalIgnoreCase)) ?? target;
+                allNames.Add(canonicalTarget);
+                edges.Add((para.Name, canonicalTarget));
+            }
         }
 
         var sb = new StringBuilder();

@@ -75,31 +75,31 @@ public class ProcedureToPseudoCodeEmitter
                 EmitOpen(open);
                 break;
             case CloseStatement:
-                Emit($"CLOSE {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "CLOSE");
                 break;
             case ReadStatement read:
                 EmitRead(read);
                 break;
             case WriteStatement:
-                Emit($"WRITE {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "WRITE");
                 break;
             case RewriteStatement:
-                Emit($"REWRITE {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "REWRITE");
                 break;
             case StartStatement:
-                Emit($"START {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "START");
                 break;
             case InitializeStatement init:
                 EmitInitialize(init);
                 break;
             case ComputeStatement:
-                Emit($"COMPUTE {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "COMPUTE");
                 break;
             case StringStatement:
-                Emit($"STRING {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "STRING");
                 break;
             case InspectStatement:
-                Emit($"INSPECT {stmt.Text ?? ""}");
+                Emit(stmt.Text ?? "INSPECT");
                 break;
             case SimpleStatement simple:
                 EmitSimple(simple);
@@ -252,7 +252,7 @@ public class ProcedureToPseudoCodeEmitter
     private void EmitDisplay(DisplayStatement display)
     {
         if (!string.IsNullOrEmpty(display.Text))
-            Emit($"DISPLAY {display.Text}");
+            Emit(display.Text);
         else
             Emit("DISPLAY ...");
     }
@@ -260,7 +260,7 @@ public class ProcedureToPseudoCodeEmitter
     private void EmitAccept(AcceptStatement accept)
     {
         if (!string.IsNullOrWhiteSpace(accept.AcceptFromEnvironment))
-            Emit($"ACCEPT {accept.AcceptTarget ?? "?"} FROM ENVIRONMENT {accept.AcceptFromEnvironment}");
+            Emit($"ACCEPT {accept.AcceptTarget ?? "?"} FROM ENVIRONMENT \"{accept.AcceptFromEnvironment}\"");
         else if (!string.IsNullOrWhiteSpace(accept.AcceptTarget))
             Emit($"ACCEPT {accept.AcceptTarget}");
         else

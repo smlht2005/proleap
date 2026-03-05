@@ -8,10 +8,8 @@ namespace ConvertCobol.Tests;
 /// <summary>
 /// JSON serialize → deserialize round-trip tests.
 /// Uses JsonAstReporter.Generate() for serialization and AstJsonLoader.LoadFromString() for deserialization.
-/// Note: Statement subclass concrete types may not survive round-trip because
-/// StatementNodeJsonConverter.Write serializes with runtime type (good for properties)
-/// but AstJsonLoader deserializes through AstNode polymorphism which may not have
-/// the matching $type discriminator for each statement.
+/// Statement subclass concrete types are preserved across the JSON round-trip via
+/// StatementNodeJsonConverter and AstNode polymorphic deserialization with $type discriminators.
 /// </summary>
 public class JsonRoundTripTests
 {
