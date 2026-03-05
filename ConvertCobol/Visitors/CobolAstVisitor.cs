@@ -112,21 +112,26 @@ using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using ConvertCobol.Generated;
 using ConvertCobol.Models;
+using ConvertCobol.Models.Statements;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ConvertCobol.Visitors;
 
 public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 {
     private readonly ProgramAst _ast = new();
+    private readonly ILogger _logger;
     private DivisionNode? _currentDataDivision;
     private DivisionNode? _currentProcedureDivision;
     private InputOutputSectionNode? _currentInputOutputSection;
     private List<AstNode>? _currentDataItemTarget;
     private FileSectionNode? _currentFileSection;
-    private Stack<ScreenDescriptionItemNode> _screenItemStack = new();
     private string? _cobolSource;
-    private Dictionary<ScreenDescriptionItemNode, int> _screenItemLineNumbers = new();
-    private Dictionary<ScreenDescriptionItemNode, string> _screenItemRawText = new();
+    private ScreenSectionVisitor? _screenVisitor;
+
+    public CobolAstVisitor() : this(NullLogger<CobolAstVisitor>.Instance) { }
+    public CobolAstVisitor(ILogger<CobolAstVisitor> logger) { _logger = logger; }
 
     public ProgramAst Result => _ast;
 
@@ -321,6 +326,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         _currentDataItemTarget = fd.Children;
         VisitChildren(context);
         _currentDataItemTarget = prevTarget;
+        fd.Children = DataItemHierarchyBuilder.BuildHierarchy(fd.Children);
         _currentFileSection?.Children.Add(fd);
         return null;
     }
@@ -332,6 +338,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         _currentDataItemTarget = section.Children;
         VisitChildren(context);
         _currentDataItemTarget = prevTarget;
+        section.Children = DataItemHierarchyBuilder.BuildHierarchy(section.Children);
         if (_currentDataDivision != null)
             _currentDataDivision.Children.Add(section);
         return null;
@@ -344,6 +351,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         _currentDataItemTarget = section.Children;
         VisitChildren(context);
         _currentDataItemTarget = prevTarget;
+        section.Children = DataItemHierarchyBuilder.BuildHierarchy(section.Children);
         if (_currentDataDivision != null)
             _currentDataDivision.Children.Add(section);
         return null;
@@ -351,223 +359,24 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitScreenSection(Cobol85AcuParser.ScreenSectionContext context)
     {
-        Console.Error.WriteLine("[SCREEN] VisitScreenSection: 開始解析 SCREEN SECTION");
-        _screenItemStack.Clear();
-        var section = new ScreenSectionNode { SectionName = "SCREEN" };
-        var prevTarget = _currentDataItemTarget;
-        _currentDataItemTarget = section.Children;
-        VisitChildren(context);
-        _currentDataItemTarget = prevTarget;
-        if (_currentDataDivision != null)
-            _currentDataDivision.Children.Add(section);
-        
-        // 後處理：填充 guiProperties（從原始文字提取 continuation lines）
-        FillScreenItemPropertiesFromSource(section);
-        
-        _ast.ScreenSectionItemCount = CountScreenItemsRecursive(section.Children);
-        Console.Error.WriteLine($"[SCREEN] VisitScreenSection: 完成，共 {section.Children.Count} 個 entries，{_ast.ScreenSectionItemCount} 個 screen items");
-        return null;
-    }
-
-    /// <summary>遞迴統計 SCREEN SECTION 中所有 ScreenDescriptionItemNode 數量。</summary>
-    private static int CountScreenItemsRecursive(List<AstNode> nodes)
-    {
-        var count = 0;
-        foreach (var node in nodes)
-        {
-            if (node is ScreenDescriptionItemNode item)
-            {
-                count += 1 + CountScreenItemsRecursive(item.Children.Cast<AstNode>().ToList());
-            }
-        }
-        return count;
+        _screenVisitor = new ScreenSectionVisitor(_logger, _cobolSource, VisitChildren);
+        var result = _screenVisitor.VisitScreenSection(context, _ast, _currentDataDivision);
+        _screenVisitor = null;
+        return result;
     }
 
     public override object? VisitScreenDescriptionEntry(Cobol85AcuParser.ScreenDescriptionEntryContext context)
     {
-        var item = new ScreenDescriptionItemNode();
-        var levelTok = context.INTEGERLITERAL();
-        if (levelTok != null)
-            item.Level = levelTok.GetText() ?? "";
-        var sn = context.screenName();
-        if (sn != null)
-            item.Name = GetText(sn) ?? "";
-        else if (context.FILLER() != null)
-            item.Name = "FILLER";
-
-        var lineClauses = context.screenDescriptionLineClause();
-        if (lineClauses.Length > 0) item.LineClause = GetText(lineClauses[0]);
-        var colClauses = context.screenDescriptionColumnClause();
-        if (colClauses.Length > 0) item.ColumnClause = GetText(colClauses[0]);
-        var sizeClauses = context.screenDescriptionSizeClause();
-        if (sizeClauses.Length > 0) item.SizeClause = GetText(sizeClauses[0]);
-        var valClauses = context.screenDescriptionValueClause();
-        if (valClauses.Length > 0) item.ValueClause = GetText(valClauses[0]);
-        var picClauses = context.screenDescriptionPictureClause();
-        if (picClauses.Length > 0) item.PictureClause = GetText(picClauses[0]);
-        var fgClauses = context.screenDescriptionForegroundColorClause();
-        if (fgClauses.Length > 0) item.ForegroundColorClause = GetText(fgClauses[0]);
-        var bgClauses = context.screenDescriptionBackgroundColorClause();
-        if (bgClauses.Length > 0) item.BackgroundColorClause = GetText(bgClauses[0]);
-
-        Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: level={item.Level}, name={item.Name}");
-        Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: 子句數量 - Line:{lineClauses.Length}, Col:{colClauses.Length}, Size:{sizeClauses.Length}, Value:{valClauses.Length}, Pic:{picClauses.Length}");
-
-        // 記錄行號和原始文字
-        var lineNumber = context.Start != null ? context.Start.Line : 0;
-        var rawText = context.GetText();
-        if (lineNumber > 0)
-        {
-            _screenItemLineNumbers[item] = lineNumber;
-            _screenItemRawText[item] = rawText;
-            Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: 記錄行號 {lineNumber}, 原始文字長度={rawText.Length}");
-        }
-
-        // 建立父子關係
-        if (_screenItemStack.Count > 0)
-        {
-            var parent = _screenItemStack.Peek();
-            // 如果當前 item 的 level > parent 的 level，則為 child
-            if (CompareLevels(item.Level, parent.Level) > 0)
-            {
-                parent.Children.Add(item);
-                Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: 加入 parent (level={parent.Level}, name={parent.Name}) 的 Children");
-            }
-            else
-            {
-                // level <= parent level，需要回溯 stack 找到正確的 parent
-                while (_screenItemStack.Count > 0 && CompareLevels(_screenItemStack.Peek().Level, item.Level) >= 0)
-                {
-                    _screenItemStack.Pop();
-                }
-                if (_screenItemStack.Count > 0)
-                {
-                    _screenItemStack.Peek().Children.Add(item);
-                    Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: 回溯後加入 parent (level={_screenItemStack.Peek().Level}, name={_screenItemStack.Peek().Name}) 的 Children");
-                }
-                else
-                {
-                    _currentDataItemTarget?.Add(item);
-                    Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: 無 parent，加入 section.Children");
-                }
-            }
-        }
-        else
-        {
-            _currentDataItemTarget?.Add(item);
-            Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: stack 為空，加入 section.Children");
-        }
-
-        // 將當前 item 推入 stack
-        _screenItemStack.Push(item);
-
-        var result = VisitChildren(context);
-        Console.Error.WriteLine($"[SCREEN] VisitScreenDescriptionEntry: 完成，guiProperties.Count={item.GuiProperties.Count}, guiType={item.GuiType ?? "null"}, children.Count={item.Children.Count}");
-        return result;
+        if (_screenVisitor != null)
+            return _screenVisitor.VisitScreenDescriptionEntry(context);
+        return base.VisitScreenDescriptionEntry(context);
     }
 
     public override object? VisitAcuScreenContinuation(Cobol85AcuParser.AcuScreenContinuationContext context)
     {
-        var text = context?.GetText()?.Trim();
-        Console.Error.WriteLine($"[SCREEN] VisitAcuScreenContinuation: text=\"{text}\"");
-        if (string.IsNullOrEmpty(text))
-        {
-            Console.Error.WriteLine("[SCREEN] VisitAcuScreenContinuation: text 為空，跳過");
-            return VisitChildren(context);
-        }
-
-        // 檢測是否為新 entry（以數字開頭，如 "03 S-RCB1-Fr-1"）
-        if (char.IsDigit(text[0]))
-        {
-            // 解析新 entry
-            var entry = ParseScreenEntryFromContinuation(text);
-            if (entry != null)
-            {
-                // 記錄行號和原始文字
-                var lineNumber = context.Start?.Line ?? 0;
-                var rawText = context.GetText() ?? "";
-                if (lineNumber > 0)
-                {
-                    _screenItemLineNumbers[entry] = lineNumber;
-                    _screenItemRawText[entry] = rawText;
-                    Console.Error.WriteLine($"[SCREEN] VisitAcuScreenContinuation: 記錄新 entry 行號 {lineNumber}, 原始文字長度={rawText.Length}");
-                }
-
-                // 加入 parent 的 Children
-                if (_screenItemStack.Count > 0)
-                {
-                    var parent = _screenItemStack.Peek();
-                    // 如果 entry 的 level > parent 的 level，則為 child
-                    if (CompareLevels(entry.Level, parent.Level) > 0)
-                    {
-                        parent.Children.Add(entry);
-                        _screenItemStack.Push(entry);
-                        Console.Error.WriteLine($"[SCREEN] VisitAcuScreenContinuation: 新 entry 加入 parent (level={parent.Level}, name={parent.Name}) 的 Children");
-                    }
-                    else
-                    {
-                        // level <= parent level，需要回溯 stack 找到正確的 parent
-                        while (_screenItemStack.Count > 0 && CompareLevels(_screenItemStack.Peek().Level, entry.Level) >= 0)
-                        {
-                            _screenItemStack.Pop();
-                        }
-                        if (_screenItemStack.Count > 0)
-                        {
-                            _screenItemStack.Peek().Children.Add(entry);
-                            _screenItemStack.Push(entry);
-                            Console.Error.WriteLine($"[SCREEN] VisitAcuScreenContinuation: 回溯後加入 parent (level={_screenItemStack.Peek().Level}, name={_screenItemStack.Peek().Name}) 的 Children");
-                        }
-                        else
-                        {
-                            // 無 parent，加入 section.Children
-                            _currentDataItemTarget?.Add(entry);
-                            _screenItemStack.Push(entry);
-                            Console.Error.WriteLine("[SCREEN] VisitAcuScreenContinuation: 無 parent，加入 section.Children");
-                        }
-                    }
-                }
-                else
-                {
-                    // 無 parent，加入 section.Children
-                    _currentDataItemTarget?.Add(entry);
-                    _screenItemStack.Push(entry);
-                    Console.Error.WriteLine("[SCREEN] VisitAcuScreenContinuation: stack 為空，加入 section.Children");
-                }
-            }
-            return VisitChildren(context);
-        }
-
-        // 取得當前最後一個 ScreenDescriptionItemNode（從 stack）
-        if (_screenItemStack.Count == 0)
-        {
-            Console.Error.WriteLine("[SCREEN] VisitAcuScreenContinuation: 警告 - stack 為空，無法找到 ScreenDescriptionItemNode");
-            return VisitChildren(context);
-        }
-
-        var last = _screenItemStack.Peek();
-        var beforeCount = last.GuiProperties.Count;
-
-        // 解析 continuation 文字為 key-value pairs
-        var parsedProperties = ParseGuiProperties(text);
-        foreach (var kvp in parsedProperties)
-        {
-            last.GuiProperties[kvp.Key] = kvp.Value;
-        }
-
-        // 識別 GuiType（Frame、Label、Grid 等）
-        var firstWord = text.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        if (!string.IsNullOrEmpty(firstWord))
-        {
-            if (string.Equals(firstWord, "Frame", StringComparison.OrdinalIgnoreCase))
-                last.GuiType ??= "Frame";
-            else if (string.Equals(firstWord, "Label", StringComparison.OrdinalIgnoreCase))
-                last.GuiType ??= "Label";
-            else if (string.Equals(firstWord, "Grid", StringComparison.OrdinalIgnoreCase))
-                last.GuiType ??= "Grid";
-        }
-
-        Console.Error.WriteLine($"[SCREEN] VisitAcuScreenContinuation: 成功解析，guiProperties.Count={beforeCount}→{last.GuiProperties.Count}, guiType={last.GuiType ?? "null"}");
-        return VisitChildren(context);
+        if (_screenVisitor != null)
+            return _screenVisitor.VisitAcuScreenContinuation(context);
+        return base.VisitAcuScreenContinuation(context);
     }
 
     public override object? VisitDataDescriptionEntryFormat1(Cobol85AcuParser.DataDescriptionEntryFormat1Context context)
@@ -650,120 +459,6 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
             }
         }
 
-        // 資料完整性驗證與錯誤恢復：確保 parser 不遺失任何語句
-        if (_cobolSource != null && context.Start != null && context.Stop != null)
-        {
-            var paraStart = context.Start.StartIndex;
-            var paraEnd = context.Stop.StopIndex;
-            
-            // [DIAGNOSTIC] 記錄 parser 識別的 paragraph 範圍
-            if (name == "F-WIN-CLOCK")
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC] Paragraph '{name}' parser range: start={paraStart}, end={paraEnd}, length={paraEnd - paraStart + 1}");
-                var parserText = _cobolSource.Substring(paraStart, Math.Min(500, paraEnd - paraStart + 1));
-                Console.Error.WriteLine($"[DIAGNOSTIC] Parser text preview: {parserText.Replace("\r", "\\r").Replace("\n", "\\n")}");
-            }
-            
-            if (paraStart >= 0 && paraEnd >= paraStart && paraEnd < _cobolSource.Length)
-            {
-                var paraText = _cobolSource.Substring(paraStart, paraEnd - paraStart + 1);
-                var parsedStatements = para.Statements;
-                
-                // [DIAGNOSTIC] 記錄已解析的語句數量
-                if (name == "F-WIN-CLOCK")
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC] Paragraph '{name}' parsed statements count: {parsedStatements.Count}");
-                    foreach (var stmt in parsedStatements)
-                    {
-                        var textPreview = stmt.Text != null ? stmt.Text.Substring(0, Math.Min(80, stmt.Text.Length)) : "";
-                    Console.Error.WriteLine($"[DIAGNOSTIC]   - {stmt.StatementType}: {textPreview}...");
-                    }
-                }
-                
-                // 特殊處理：如果 paragraph 名稱是 F-WIN-CLOCK，擴展搜尋範圍以包含註解行後的語句
-                if (name == "F-WIN-CLOCK")
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC] Starting special handling for F-WIN-CLOCK");
-                    
-                    // 向後查找下一個 paragraph 或 section 的開始位置
-                    var nextParaStart = paraEnd + 1;
-                    var searchIterations = 0;
-                    while (nextParaStart < _cobolSource.Length && nextParaStart - paraStart < 2000)
-                    {
-                        searchIterations++;
-                        var remainingText = _cobolSource.Substring(nextParaStart, Math.Min(500, _cobolSource.Length - nextParaStart));
-                        
-                        // [DIAGNOSTIC] 記錄搜尋過程
-                        Console.Error.WriteLine($"[DIAGNOSTIC] Search iteration {searchIterations}: nextParaStart={nextParaStart}, remainingText preview: {remainingText.Substring(0, Math.Min(100, remainingText.Length)).Replace("\r", "\\r").Replace("\n", "\\n")}");
-                        
-                        // 查找下一個 paragraph 名稱（格式：名稱.）
-                        var nextParaMatch = System.Text.RegularExpressions.Regex.Match(remainingText, @"^\s*([A-Z0-9-]+)\s*\.", System.Text.RegularExpressions.RegexOptions.Multiline);
-                        if (nextParaMatch.Success)
-                        {
-                            var nextParaNameStart = nextParaMatch.Index + nextParaStart;
-                            var nextParaName = nextParaMatch.Groups[1].Value;
-                            Console.Error.WriteLine($"[DIAGNOSTIC] Found next paragraph '{nextParaName}' at position {nextParaNameStart}");
-                            
-                            // 檢查 nextParaNameStart 之前是否有 DISPLAY 語句
-                            var extendedText = _cobolSource.Substring(paraStart, nextParaNameStart - paraStart);
-                            var displayMatches = System.Text.RegularExpressions.Regex.Matches(extendedText, @"DISPLAY\s+[^.]*\.", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-                            
-                            Console.Error.WriteLine($"[DIAGNOSTIC] Extended text length: {extendedText.Length}, DISPLAY matches: {displayMatches.Count}, parsed statements: {parsedStatements.Count}");
-                            
-                            if (displayMatches.Count > parsedStatements.Count)
-                            {
-                                paraText = extendedText;
-                                paraEnd = nextParaNameStart - 1;
-                                Console.Error.WriteLine($"[DIAGNOSTIC] Extended paragraph text to include second DISPLAY. New paraEnd: {paraEnd}");
-                                Console.Error.WriteLine($"[DIAGNOSTIC] Extended text preview: {extendedText.Substring(Math.Max(0, extendedText.Length - 200)).Replace("\r", "\\r").Replace("\n", "\\n")}");
-                            }
-                            else
-                            {
-                                Console.Error.WriteLine($"[DIAGNOSTIC] No additional DISPLAY statements found in extended text");
-                            }
-                            break;
-                        }
-                        nextParaStart += 500;
-                        if (nextParaStart >= _cobolSource.Length) break;
-                    }
-                    
-                    if (searchIterations == 0 || nextParaStart >= _cobolSource.Length)
-                    {
-                        Console.Error.WriteLine($"[DIAGNOSTIC] Special handling did not find next paragraph");
-                    }
-                }
-                
-                // [DIAGNOSTIC] 記錄最終使用的 paragraph 文字
-                if (name == "F-WIN-CLOCK")
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC] Final paragraph text length: {paraText.Length}");
-                    Console.Error.WriteLine($"[DIAGNOSTIC] Final paragraph text: {paraText.Replace("\r", "\\r").Replace("\n", "\\n")}");
-                }
-                
-                var (isValid, missingStatements) = ValidateParagraphCompleteness(
-                    paraText, 
-                    parsedStatements, 
-                    context.sentence().Length,
-                    name);
-                
-                // [DIAGNOSTIC] 記錄驗證結果
-                if (name == "F-WIN-CLOCK")
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC] Validation result: isValid={isValid}, missingStatements.Count={missingStatements.Count}");
-                }
-                
-                if (!isValid && missingStatements.Count > 0)
-                {
-                    Console.Error.WriteLine($"[DATA INTEGRITY] Recovered {missingStatements.Count} missing statements in paragraph '{name}'");
-                    foreach (var stmt in missingStatements)
-                    {
-                        para.Statements.Add(stmt);
-                        _ast.StatementCount++;
-                    }
-                }
-            }
-        }
-
         _currentProcedureDivision?.Children.Add(para);
         return para;
     }
@@ -801,12 +496,18 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
             return VisitDisplayStatement(context.displayStatement());
         var text = GetSourceSlice(context);
         var stmtType = GetStatementType(context);
-        return new StatementNode { StatementType = stmtType, Text = text };
+        return stmtType switch
+        {
+            "WRITE" => new WriteStatement { Text = text },
+            "REWRITE" => new RewriteStatement { Text = text },
+            "COMPUTE" => new ComputeStatement { Text = text },
+            _ => new SimpleStatement(stmtType) { Text = text }
+        };
     }
 
     public override object? VisitMoveStatement(Cobol85AcuParser.MoveStatementContext context)
     {
-        var node = new StatementNode { StatementType = "MOVE", Text = GetSourceSlice(context) };
+        var node = new MoveStatement { Text = GetSourceSlice(context) };
         var moveTo = context.moveToStatement();
         if (moveTo != null)
         {
@@ -853,7 +554,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         if (procStmt == null)
         {
             // inline PERFORM（PERFORM ... END-PERFORM）
-            var inlineNode = new StatementNode { StatementType = "PERFORM", Text = GetSourceSlice(context), PerformInline = true };
+            var inlineNode = new PerformStatement { Text = GetSourceSlice(context), PerformInline = true };
             var inline = context.performInlineStatement();
             var typeCtx = inline?.performType();
             if (typeCtx != null)
@@ -885,7 +586,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
             return inlineNode;
         }
         // 段落 PERFORM（PERFORM 段落 [THRU 段落] [TIMES/UNTIL/VARYING]）
-        var node = new StatementNode { StatementType = "PERFORM", Text = GetSourceSlice(context), PerformInline = false };
+        var node = new PerformStatement { Text = GetSourceSlice(context), PerformInline = false };
         var names = procStmt.procedureName();
         if (names != null && names.Length > 0)
         {
@@ -916,7 +617,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitCallStatement(Cobol85AcuParser.CallStatementContext context)
     {
-        var node = new StatementNode { StatementType = "CALL", Text = GetSourceSlice(context) };
+        var node = new CallStatement { Text = GetSourceSlice(context) };
         var id = context.identifier();
         if (id != null)
             node.CallTarget = GetText(id);
@@ -983,7 +684,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitOpenStatement(Cobol85AcuParser.OpenStatementContext context)
     {
-        var node = new StatementNode { StatementType = "OPEN", Text = GetSourceSlice(context) };
+        var node = new OpenStatement { Text = GetSourceSlice(context) };
         var targets = new List<string>();
         string? openType = null;
 
@@ -1071,7 +772,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitCloseStatement(Cobol85AcuParser.CloseStatementContext context)
     {
-        var node = new StatementNode { StatementType = "CLOSE", Text = GetSourceSlice(context) };
+        var node = new CloseStatement { Text = GetSourceSlice(context) };
         var closeFiles = context.closeFile();
         if (closeFiles != null && closeFiles.Length > 0)
         {
@@ -1091,7 +792,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitInitializeStatement(Cobol85AcuParser.InitializeStatementContext context)
     {
-        var node = new StatementNode { StatementType = "INITIALIZE", Text = GetSourceSlice(context) };
+        var node = new InitializeStatement { Text = GetSourceSlice(context) };
         var ids = context.identifier();
         if (ids != null && ids.Length > 0)
         {
@@ -1102,7 +803,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitReadStatement(Cobol85AcuParser.ReadStatementContext context)
     {
-        var node = new StatementNode { StatementType = "READ", Text = GetSourceSlice(context) };
+        var node = new ReadStatement { Text = GetSourceSlice(context) };
         var fileName = context.fileName();
         if (fileName != null)
             node.ReadTarget = GetText(fileName);
@@ -1118,7 +819,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitStartStatement(Cobol85AcuParser.StartStatementContext context)
     {
-        var node = new StatementNode { StatementType = "START", Text = GetSourceSlice(context) };
+        var node = new StartStatement { Text = GetSourceSlice(context) };
         var fileName = context.fileName();
         if (fileName != null)
             node.StartTarget = GetText(fileName);
@@ -1143,7 +844,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitIfStatement(Cobol85AcuParser.IfStatementContext context)
     {
-        var node = new StatementNode { StatementType = "IF", Text = GetSourceSlice(context) };
+        var node = new IfStatement { Text = GetSourceSlice(context) };
         var cond = context.condition();
         if (cond != null)
             node.IfCondition = GetSourceSlice(cond);
@@ -1188,7 +889,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitEvaluateStatement(Cobol85AcuParser.EvaluateStatementContext context)
     {
-        var node = new StatementNode { StatementType = "EVALUATE", Text = GetSourceSlice(context) };
+        var node = new EvaluateStatement { Text = GetSourceSlice(context) };
         var selectCtx = context.evaluateSelect();
         if (selectCtx != null)
             node.EvaluateSubject = GetSourceSlice(selectCtx);
@@ -1228,7 +929,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
     }
 
     /// <summary>修正 EVALUATE 內因 COBOL 續行而誤併的 statement：續行導致 \" WHEN 901\"、\" WHEN OTHER\" 被併入上一句 MOVE，此函數截斷 Text 並修正 moveTo。</summary>
-    private static void NormalizeEvaluateBlockStatements(StatementNode evaluateNode)
+    private static void NormalizeEvaluateBlockStatements(EvaluateStatement evaluateNode)
     {
         if (evaluateNode.EvaluateWhenPhrases != null)
         {
@@ -1247,7 +948,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
     }
 
     /// <summary>若 statement.Text 含換行後接空白與 WHEN（如 WHEN 901、WHEN OTHER），截斷至該處並修正 MOVE 的 moveTo。</summary>
-    private static void FixStatementTruncateAtWhen(StatementNode stmt)
+    internal static void FixStatementTruncateAtWhen(StatementNode stmt)
     {
         var text = stmt.Text;
         if (string.IsNullOrEmpty(text)) return;
@@ -1258,8 +959,8 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         if (truncated.IndexOf('\r') >= 0 || truncated.IndexOf('\n') >= 0)
             truncated = truncated.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None)[0].Trim();
         stmt.Text = truncated;
-        if (stmt.StatementType != "MOVE" || string.IsNullOrEmpty(stmt.MoveTo)) return;
-        var moveTo = stmt.MoveTo;
+        if (stmt is not MoveStatement moveStmt || string.IsNullOrEmpty(moveStmt.MoveTo)) return;
+        var moveTo = moveStmt.MoveTo;
         var firstComma = moveTo.IndexOf(',');
         if (firstComma >= 0) moveTo = moveTo.Substring(0, firstComma).Trim();
         var whenInTo = moveTo.IndexOf("WHEN", StringComparison.OrdinalIgnoreCase);
@@ -1274,7 +975,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
             if (udIdx > 0) moveTo = moveTo.Substring(0, udIdx).Trim().TrimEnd(',', ' ');
         }
         if (!string.IsNullOrEmpty(moveTo))
-            stmt.MoveTo = moveTo;
+            moveStmt.MoveTo = moveTo;
     }
 
     /// <summary>走訪整個 PROCEDURE 樹，對所有 StatementNode（含段落層級與巢狀 EVALUATE/IF）套用續行誤併修正。單一入口，確保 WHEN 901 / WHEN OTHER 被截斷。</summary>
@@ -1295,27 +996,36 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
     {
         if (stmt == null) return;
         FixStatementTruncateAtWhen(stmt);
-        if (stmt.StatementType == "ACCEPT")
-            EnrichAcceptFromText(stmt);
-        if (stmt.StatementType == "DISPLAY")
+        if (stmt is AcceptStatement acceptStmt)
+            EnrichAcceptFromText(acceptStmt);
+        if (stmt is DisplayStatement displayStmt)
         {
-            EnrichDisplayFromText(stmt);
-            EnrichDisplayProperties(stmt);
+            EnrichDisplayFromText(displayStmt);
+            EnrichDisplayProperties(displayStmt);
         }
-        if (stmt.ThenStatements != null) foreach (var s in stmt.ThenStatements) NormalizeStatementRecursive(s);
-        if (stmt.ElseStatements != null) foreach (var s in stmt.ElseStatements) NormalizeStatementRecursive(s);
-        if (stmt.PerformStatements != null) foreach (var s in stmt.PerformStatements) NormalizeStatementRecursive(s);
-        if (stmt.EvaluateWhenPhrases != null)
+        if (stmt is IfStatement ifStmt)
         {
-            foreach (var clause in stmt.EvaluateWhenPhrases)
-                if (clause.Statements != null) foreach (var s in clause.Statements) NormalizeStatementRecursive(s);
+            if (ifStmt.ThenStatements != null) foreach (var s in ifStmt.ThenStatements) NormalizeStatementRecursive(s);
+            if (ifStmt.ElseStatements != null) foreach (var s in ifStmt.ElseStatements) NormalizeStatementRecursive(s);
         }
-        if (stmt.EvaluateWhenOtherStatements != null)
-            foreach (var s in stmt.EvaluateWhenOtherStatements) NormalizeStatementRecursive(s);
+        if (stmt is PerformStatement perfStmt)
+        {
+            if (perfStmt.PerformStatements != null) foreach (var s in perfStmt.PerformStatements) NormalizeStatementRecursive(s);
+        }
+        if (stmt is EvaluateStatement evalStmt)
+        {
+            if (evalStmt.EvaluateWhenPhrases != null)
+            {
+                foreach (var clause in evalStmt.EvaluateWhenPhrases)
+                    if (clause.Statements != null) foreach (var s in clause.Statements) NormalizeStatementRecursive(s);
+            }
+            if (evalStmt.EvaluateWhenOtherStatements != null)
+                foreach (var s in evalStmt.EvaluateWhenOtherStatements) NormalizeStatementRecursive(s);
+        }
     }
 
     /// <summary>當文法無法解析 ACCEPT FROM ENVIRONMENT literal 時，從 Text 以 regex 擷取 AcceptTarget、AcceptFromEnvironment、AcceptBlockEnd。</summary>
-    private static void EnrichAcceptFromText(StatementNode stmt)
+    internal static void EnrichAcceptFromText(AcceptStatement stmt)
     {
         if (stmt?.Text == null) return;
         var text = stmt.Text;
@@ -1335,7 +1045,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
     }
 
     /// <summary>從 DISPLAY 語句 Text 擷取 DisplayUpon、DisplayOperands、DisplayBlockEnd（區塊以 . 或 END-DISPLAY 結束）。</summary>
-    private static void EnrichDisplayFromText(StatementNode stmt)
+    internal static void EnrichDisplayFromText(DisplayStatement stmt)
     {
         if (stmt?.Text == null) return;
         var text = stmt.Text;
@@ -1371,9 +1081,9 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
     }
 
     /// <summary>從 DISPLAY 語句文字解析擴充語法屬性（LINES, SIZE, COLOR, TITLE, HANDLE 等）</summary>
-    private static void EnrichDisplayProperties(StatementNode stmt)
+    internal static void EnrichDisplayProperties(DisplayStatement stmt)
     {
-        if (stmt?.Text == null || stmt.StatementType != "DISPLAY") return;
+        if (stmt?.Text == null) return;
         var text = stmt.Text;
         
         // 解析 WINDOW 類型（Floating、GRAPHICAL 等）
@@ -1435,7 +1145,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitStringStatement(Cobol85AcuParser.StringStatementContext context)
     {
-        var node = new StatementNode { StatementType = "STRING", Text = GetSourceSlice(context) };
+        var node = new StringStatement { Text = GetSourceSlice(context) };
         var intoPhrase = context.stringIntoPhrase();
         if (intoPhrase?.identifier() != null)
             node.StringInto = GetText(intoPhrase.identifier());
@@ -1447,23 +1157,27 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitAcceptStatement(Cobol85AcuParser.AcceptStatementContext context)
     {
-        var node = new StatementNode { StatementType = "ACCEPT", Text = GetSourceSlice(context) };
+        var node = new AcceptStatement { Text = GetSourceSlice(context) };
         var id = context.identifier();
         if (id != null)
             node.AcceptTarget = GetText(id);
         if (context.END_ACCEPT() != null)
             node.AcceptBlockEnd = "END-ACCEPT";
-        var mnemonic = context.acceptFromMnemonicStatement();
-        if (mnemonic?.mnemonicName() != null)
+        var envStmt = context.acceptFromEnvironmentStatement();
+        if (envStmt != null)
         {
-            var mnemonicText = GetText(mnemonic.mnemonicName());
-            if (string.Equals(mnemonicText, "ENVIRONMENT", StringComparison.OrdinalIgnoreCase))
+            // FROM ENVIRONMENT "literal" or FROM ENVIRONMENT identifier
+            var envArg = envStmt.literal() != null ? GetText(envStmt.literal()) : envStmt.identifier() != null ? GetText(envStmt.identifier()) : null;
+            if (envArg != null)
+                node.AcceptFromEnvironment = envArg.Trim('"', '\'');
+        }
+        else
+        {
+            var mnemonic = context.acceptFromMnemonicStatement();
+            if (mnemonic?.mnemonicName() != null)
             {
-                // FROM ENVIRONMENT "literal" - literal 不在文法中，由 EnrichAcceptFromText 從 Text 擷取
-                // 此處僅標記已為 FROM mnemonic，EnrichAcceptFromText 會補上 AcceptFromEnvironment
+                node.AcceptFromEnvironment = GetText(mnemonic.mnemonicName());
             }
-            else
-                node.AcceptFromEnvironment = mnemonicText;
         }
         return node;
     }
@@ -1554,7 +1268,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
                 fullText = GetSourceSlice(context);
         }
         
-        var node = new StatementNode { StatementType = "DISPLAY", Text = fullText };
+        var node = new DisplayStatement { Text = fullText };
         var operands = context.displayOperand();
         if (operands != null && operands.Length > 0)
         {
@@ -1582,7 +1296,7 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
 
     public override object? VisitInspectStatement(Cobol85AcuParser.InspectStatementContext context)
     {
-        var node = new StatementNode { StatementType = "INSPECT", Text = GetSourceSlice(context) };
+        var node = new InspectStatement { Text = GetSourceSlice(context) };
         if (context.identifier() != null)
             node.InspectTarget = GetText(context.identifier());
         var tallying = context.inspectTallyingPhrase();
@@ -1609,22 +1323,22 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
     {
         var id = context.identifier();
         var name = id?.Length > 0 ? GetText(id[0]) : "";
-        return new StatementNode { StatementType = "CREATE", Text = GetSourceSlice(context) };
+        return new SimpleStatement("CREATE") { Text = GetSourceSlice(context) };
     }
 
     public override object? VisitAcuModifyStatement(Cobol85AcuParser.AcuModifyStatementContext context)
     {
-        return new StatementNode { StatementType = "MODIFY", Text = GetSourceSlice(context) };
+        return new SimpleStatement("MODIFY") { Text = GetSourceSlice(context) };
     }
 
     public override object? VisitAcuInquireStatement(Cobol85AcuParser.AcuInquireStatementContext context)
     {
-        return new StatementNode { StatementType = "INQUIRE", Text = GetSourceSlice(context) };
+        return new SimpleStatement("INQUIRE") { Text = GetSourceSlice(context) };
     }
 
     public override object? VisitAcuDestroyStatement(Cobol85AcuParser.AcuDestroyStatementContext context)
     {
-        return new StatementNode { StatementType = "DESTROY", Text = GetSourceSlice(context) };
+        return new SimpleStatement("DESTROY") { Text = GetSourceSlice(context) };
     }
 
     private static string GetStatementType(Cobol85AcuParser.StatementContext ctx)
@@ -1661,480 +1375,6 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         if (ctx.inspectStatement() != null) return "INSPECT";
         if (ctx.setStatement() != null) return "SET";
         return "OTHER";
-    }
-
-    /// <summary>驗證 paragraph 的資料完整性，確保無語句遺失</summary>
-    private (bool isValid, List<StatementNode> missingStatements) ValidateParagraphCompleteness(
-        string paragraphText, 
-        List<StatementNode> parsedStatements,
-        int parserSentenceCount,
-        string paragraphName)
-    {
-        var missingStatements = new List<StatementNode>();
-        var isValid = true;
-        
-        // [DIAGNOSTIC] 記錄驗證開始
-        if (paragraphName == "F-WIN-CLOCK")
-        {
-            Console.Error.WriteLine($"[DIAGNOSTIC] ValidateParagraphCompleteness for '{paragraphName}'");
-            Console.Error.WriteLine($"[DIAGNOSTIC]   paragraphText length: {paragraphText.Length}");
-            Console.Error.WriteLine($"[DIAGNOSTIC]   parsedStatements count: {parsedStatements.Count}");
-            Console.Error.WriteLine($"[DIAGNOSTIC]   parserSentenceCount: {parserSentenceCount}");
-        }
-        
-        // 1. 計算原始文字中的句點數量（排除註解行）
-        var periodCount = CountPeriodsExcludingComments(paragraphText);
-        
-        // [DIAGNOSTIC] 記錄句點計數
-        if (paragraphName == "F-WIN-CLOCK")
-        {
-            Console.Error.WriteLine($"[DIAGNOSTIC]   periodCount (excluding comments): {periodCount}");
-        }
-        
-        // 2. 比對 sentence 數量
-        if (parserSentenceCount != periodCount)
-        {
-            isValid = false;
-            Console.Error.WriteLine($"[DATA INTEGRITY] Paragraph '{paragraphName}' sentence count mismatch: parser={parserSentenceCount}, actual={periodCount}");
-        }
-        
-        // 3. 識別所有語句關鍵字（計算每個關鍵字出現次數）
-        var statementKeywordCounts = CountStatementKeywords(paragraphText);
-        var parsedKeywordCounts = parsedStatements
-            .GroupBy(s => s.StatementType)
-            .ToDictionary(g => g.Key, g => g.Count());
-        
-        // [DIAGNOSTIC] 記錄關鍵字計數
-        if (paragraphName == "F-WIN-CLOCK")
-        {
-            Console.Error.WriteLine($"[DIAGNOSTIC]   statementKeywordCounts: {string.Join(", ", statementKeywordCounts.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
-            Console.Error.WriteLine($"[DIAGNOSTIC]   parsedKeywordCounts: {string.Join(", ", parsedKeywordCounts.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
-        }
-        
-        // 4. 檢查遺漏的語句（比對關鍵字出現次數）
-        foreach (var kvp in statementKeywordCounts)
-        {
-            var keyword = kvp.Key;
-            var expectedCount = kvp.Value;
-            var parsedCount = parsedKeywordCounts.GetValueOrDefault(keyword, 0);
-            
-            if (expectedCount > parsedCount)
-            {
-                isValid = false;
-                var missingCount = expectedCount - parsedCount;
-                Console.Error.WriteLine($"[DATA INTEGRITY] Paragraph '{paragraphName}' missing {missingCount} '{keyword}' statement(s): expected={expectedCount}, parsed={parsedCount}");
-            }
-        }
-        
-        // 5. 如果 sentence 數量不一致或語句數量不一致，嘗試恢復遺漏的語句
-        if (!isValid || parserSentenceCount != periodCount)
-        {
-            // [DIAGNOSTIC] 記錄恢復開始
-            if (paragraphName == "F-WIN-CLOCK")
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC] Starting RecoverMissingStatements");
-            }
-            
-            var recovered = RecoverMissingStatements(paragraphText, parsedStatements);
-            missingStatements.AddRange(recovered);
-            
-            // [DIAGNOSTIC] 記錄恢復結果
-            if (paragraphName == "F-WIN-CLOCK")
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC] RecoverMissingStatements returned {recovered.Count} statements");
-            }
-        }
-        
-        return (isValid, missingStatements);
-    }
-
-    /// <summary>計算文字中的句點數量，排除註解行</summary>
-    private int CountPeriodsExcludingComments(string text)
-    {
-        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        var count = 0;
-        foreach (var line in lines)
-        {
-            var trimmed = line.TrimStart();
-            // 跳過註解行
-            if (trimmed.StartsWith("*>", StringComparison.Ordinal) || 
-                (trimmed.StartsWith("*", StringComparison.Ordinal) && !trimmed.StartsWith("**", StringComparison.Ordinal)))
-                continue;
-            
-            // 計算句點（排除小數點，只計算行尾句點）
-            var periodIdx = trimmed.LastIndexOf('.');
-            if (periodIdx >= 0 && periodIdx == trimmed.Length - 1)
-                count++;
-        }
-        return count;
-    }
-
-    /// <summary>從文字中提取語句關鍵字</summary>
-    private List<string> ExtractStatementKeywords(string text)
-    {
-        var keywords = new List<string>();
-        var patterns = new Dictionary<string, string>
-        {
-            { "DISPLAY", @"\bDISPLAY\b" },
-            { "MOVE", @"\bMOVE\b" },
-            { "PERFORM", @"\bPERFORM\b" },
-            { "IF", @"\bIF\b" },
-            { "CALL", @"\bCALL\b" },
-            { "ACCEPT", @"\bACCEPT\b" },
-            { "READ", @"\bREAD\b" },
-            { "WRITE", @"\bWRITE\b" },
-            { "OPEN", @"\bOPEN\b" },
-            { "CLOSE", @"\bCLOSE\b" }
-        };
-        
-        foreach (var kvp in patterns)
-        {
-            if (System.Text.RegularExpressions.Regex.IsMatch(text, kvp.Value, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                keywords.Add(kvp.Key);
-        }
-        
-        return keywords;
-    }
-
-    /// <summary>計算文字中每個語句關鍵字的出現次數（排除註解行）</summary>
-    private Dictionary<string, int> CountStatementKeywords(string text)
-    {
-        var counts = new Dictionary<string, int>();
-        var patterns = new Dictionary<string, string>
-        {
-            { "DISPLAY", @"\bDISPLAY\b" },
-            { "MOVE", @"\bMOVE\b" },
-            { "PERFORM", @"\bPERFORM\b" },
-            { "IF", @"\bIF\b" },
-            { "CALL", @"\bCALL\b" },
-            { "ACCEPT", @"\bACCEPT\b" },
-            { "READ", @"\bREAD\b" },
-            { "WRITE", @"\bWRITE\b" },
-            { "OPEN", @"\bOPEN\b" },
-            { "CLOSE", @"\bCLOSE\b" }
-        };
-        
-        // 移除註解行後再計算
-        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        var nonCommentText = new System.Text.StringBuilder();
-        foreach (var line in lines)
-        {
-            var trimmed = line.TrimStart();
-            // 跳過註解行
-            if (trimmed.StartsWith("*>", StringComparison.Ordinal) || 
-                (trimmed.StartsWith("*", StringComparison.Ordinal) && trimmed.Length > 0 && trimmed[0] == '*' && !trimmed.StartsWith("**", StringComparison.Ordinal)))
-                continue;
-            nonCommentText.AppendLine(line);
-        }
-        var cleanText = nonCommentText.ToString();
-        
-        foreach (var kvp in patterns)
-        {
-            var matches = System.Text.RegularExpressions.Regex.Matches(cleanText, kvp.Value, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (matches.Count > 0)
-                counts[kvp.Key] = matches.Count;
-        }
-        
-        return counts;
-    }
-
-    /// <summary>從原始文字恢復遺漏的語句（當 parser 錯誤導致 sentence 未被正確識別時）</summary>
-    private List<StatementNode> RecoverMissingStatements(string paragraphText, List<StatementNode> existingStatements)
-    {
-        var recovered = new List<StatementNode>();
-        
-        // [DIAGNOSTIC] 記錄恢復開始
-        Console.Error.WriteLine($"[DIAGNOSTIC] RecoverMissingStatements: paragraphText length={paragraphText.Length}, existingStatements count={existingStatements.Count}");
-        
-        // 1. 找出所有句點位置（排除註解行）
-        var periodPositions = FindPeriodPositions(paragraphText);
-        
-        // [DIAGNOSTIC] 記錄句點位置
-        Console.Error.WriteLine($"[DIAGNOSTIC] FindPeriodPositions found {periodPositions.Count} periods at positions: {string.Join(", ", periodPositions)}");
-        
-        if (periodPositions.Count == 0) return recovered;
-        
-        // 2. 對每個句點，檢查對應的 sentence 是否已被解析
-        var existingTextRanges = existingStatements
-            .Where(s => !string.IsNullOrEmpty(s.Text))
-            .Select(s => s.Text!.Trim())
-            .ToList();
-        
-        foreach (var periodPos in periodPositions)
-        {
-            // [DIAGNOSTIC] 記錄每個句點的處理
-            Console.Error.WriteLine($"[DIAGNOSTIC] Processing period at position {periodPos}");
-            
-            // 從句點向前查找 sentence 開始位置（上一個句點或 paragraph 開始）
-            var sentenceStart = FindSentenceStart(paragraphText, periodPos);
-            
-            // [DIAGNOSTIC] 記錄 sentence 範圍
-            Console.Error.WriteLine($"[DIAGNOSTIC]   sentenceStart={sentenceStart}, periodPos={periodPos}");
-            
-            if (sentenceStart < 0 || sentenceStart >= paragraphText.Length) 
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC]   Invalid sentenceStart, skipping");
-                continue;
-            }
-            
-            var sentenceLength = periodPos - sentenceStart + 1;
-            if (sentenceLength <= 0 || sentenceStart + sentenceLength > paragraphText.Length) 
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC]   Invalid sentenceLength={sentenceLength}, skipping");
-                continue;
-            }
-            
-            var sentenceText = paragraphText.Substring(sentenceStart, sentenceLength).Trim();
-            
-            // [DIAGNOSTIC] 記錄 sentence 文字和範圍資訊
-            Console.Error.WriteLine($"[DIAGNOSTIC]   sentenceText length={sentenceText.Length}, sentenceStart={sentenceStart}, periodPos={periodPos}, sentenceLength={sentenceLength}");
-            Console.Error.WriteLine($"[DIAGNOSTIC]   sentenceText: {sentenceText.Substring(0, Math.Min(100, sentenceText.Length)).Replace("\r", "\\r").Replace("\n", "\\n")}");
-            Console.Error.WriteLine($"[DIAGNOSTIC]   paragraphText at periodPos: '{paragraphText.Substring(Math.Max(0, periodPos - 5), Math.Min(10, paragraphText.Length - Math.Max(0, periodPos - 5)))}'");
-            
-            if (string.IsNullOrWhiteSpace(sentenceText)) 
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC]   Empty sentenceText, skipping");
-                continue;
-            }
-            
-            // 跳過註解行
-            var firstNonWhitespace = sentenceText.TrimStart();
-            if (firstNonWhitespace.StartsWith("*>", StringComparison.Ordinal) || 
-                (firstNonWhitespace.StartsWith("*", StringComparison.Ordinal) && firstNonWhitespace.Length > 0 && firstNonWhitespace[0] == '*'))
-            {
-                Console.Error.WriteLine($"[DIAGNOSTIC]   Comment line, skipping");
-                continue;
-            }
-            
-            // 檢查這個 sentence 是否已被解析（比對文字開頭關鍵字）
-            var sentenceStartKeyword = ExtractFirstKeyword(sentenceText);
-            
-            // [DIAGNOSTIC] 記錄關鍵字提取
-            Console.Error.WriteLine($"[DIAGNOSTIC]   sentenceStartKeyword={sentenceStartKeyword}");
-            
-            var isAlreadyParsed = false;
-            if (!string.IsNullOrEmpty(sentenceStartKeyword))
-            {
-                isAlreadyParsed = existingTextRanges.Any(existing => 
-                {
-                    var existingKeyword = ExtractFirstKeyword(existing);
-                    if (existingKeyword != sentenceStartKeyword)
-                        return false;
-                    
-                    // 不僅要檢查關鍵字，還要檢查語句的實際內容是否匹配
-                    // 使用更精確的比對：檢查 sentenceText 是否與 existing 的開頭部分匹配
-                    var sentenceStartText = sentenceText.Substring(0, Math.Min(50, sentenceText.Length)).Trim();
-                    var existingStartText = existing.Substring(0, Math.Min(50, existing.Length)).Trim();
-                    
-                    // 如果兩個語句的開頭部分相同，則認為已經解析過
-                    var matches = sentenceStartText.Equals(existingStartText, StringComparison.OrdinalIgnoreCase) ||
-                                  existing.Contains(sentenceStartText, StringComparison.OrdinalIgnoreCase);
-                    
-                    // [DIAGNOSTIC] 記錄比對過程
-                    if (matches)
-                    {
-                        Console.Error.WriteLine($"[DIAGNOSTIC]   Matched with existing statement: {existing.Substring(0, Math.Min(80, existing.Length))}");
-                        Console.Error.WriteLine($"[DIAGNOSTIC]   sentenceStartText: {sentenceStartText}");
-                        Console.Error.WriteLine($"[DIAGNOSTIC]   existingStartText: {existingStartText}");
-                    }
-                    
-                    return matches;
-                });
-            }
-            
-            Console.Error.WriteLine($"[DIAGNOSTIC]   isAlreadyParsed={isAlreadyParsed}");
-            
-            if (!isAlreadyParsed)
-            {
-                // 3. 手動解析遺漏的語句
-                // 確保 sentenceText 包含句點（如果 periodPos 指向句點）
-                var fullSentenceText = sentenceText;
-                if (!sentenceText.EndsWith(".", StringComparison.Ordinal) && periodPos < paragraphText.Length && paragraphText[periodPos] == '.')
-                {
-                    fullSentenceText = sentenceText + ".";
-                }
-                
-                var stmt = ParseStatementFromText(fullSentenceText, sentenceText);
-                if (stmt != null)
-                {
-                    recovered.Add(stmt);
-                    Console.Error.WriteLine($"[DATA INTEGRITY] Recovered statement: {stmt.StatementType} - {fullSentenceText.Substring(0, Math.Min(80, fullSentenceText.Length))}...");
-                }
-                else
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC]   ParseStatementFromText returned null");
-                }
-            }
-        }
-        
-        // [DIAGNOSTIC] 記錄恢復結果
-        Console.Error.WriteLine($"[DIAGNOSTIC] RecoverMissingStatements returning {recovered.Count} statements");
-        
-        return recovered;
-    }
-
-    /// <summary>從語句文字中提取第一個關鍵字（DISPLAY, MOVE, PERFORM 等）</summary>
-    private string? ExtractFirstKeyword(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        var trimmed = text.TrimStart();
-        var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"^\s*(DISPLAY|MOVE|PERFORM|IF|CALL|ACCEPT|READ|WRITE|OPEN|CLOSE)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value.ToUpper() : null;
-    }
-
-    /// <summary>找出文字中所有句點位置（排除註解行和小數點）</summary>
-    private List<int> FindPeriodPositions(string text)
-    {
-        var positions = new List<int>();
-        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        var currentPos = 0;
-        
-        // [DIAGNOSTIC] 記錄行數
-        Console.Error.WriteLine($"[DIAGNOSTIC] FindPeriodPositions: text length={text.Length}, lines count={lines.Length}");
-        
-        foreach (var line in lines)
-        {
-            var trimmed = line.TrimStart();
-            // 跳過註解行
-            if (trimmed.StartsWith("*>", StringComparison.Ordinal) || 
-                (trimmed.StartsWith("*", StringComparison.Ordinal) && trimmed.Length > 0 && trimmed[0] == '*' && !trimmed.StartsWith("**", StringComparison.Ordinal)))
-            {
-                // [DIAGNOSTIC] 記錄跳過的註解行
-                if (trimmed.Length > 0)
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC]   Skipping comment line at position {currentPos}: {trimmed.Substring(0, Math.Min(50, trimmed.Length))}");
-                }
-                else
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC]   Skipping comment line at position {currentPos}: (empty line)");
-                }
-                currentPos += line.Length + (line.Contains("\r\n") ? 2 : 1);
-                continue;
-            }
-            
-            // 檢查行尾句點（排除小數點）
-            var periodIdx = trimmed.LastIndexOf('.');
-            if (periodIdx >= 0 && periodIdx == trimmed.Length - 1)
-            {
-                // 確認不是小數點（前面應該是數字）
-                var beforePeriod = periodIdx > 0 ? trimmed.Substring(Math.Max(0, periodIdx - 10), Math.Min(periodIdx, trimmed.Length - Math.Max(0, periodIdx - 10))) : "";
-                var isDecimal = System.Text.RegularExpressions.Regex.IsMatch(beforePeriod, @"\d\.$");
-                if (!isDecimal)
-                {
-                    var lineStartPos = currentPos + (line.Length - trimmed.Length);
-                    var periodPos = lineStartPos + periodIdx;
-                    positions.Add(periodPos);
-                    
-                    // [DIAGNOSTIC] 記錄找到的句點
-                    Console.Error.WriteLine($"[DIAGNOSTIC]   Found period at position {periodPos} (line: {trimmed.Substring(0, Math.Min(80, trimmed.Length))})");
-                }
-                else
-                {
-                    Console.Error.WriteLine($"[DIAGNOSTIC]   Skipping decimal point at position {currentPos + periodIdx}");
-                }
-            }
-            
-            currentPos += line.Length + (line.Contains("\r\n") ? 2 : 1);
-        }
-        
-        return positions;
-    }
-
-    /// <summary>從句點位置向前查找 sentence 開始位置</summary>
-    private int FindSentenceStart(string text, int periodPos)
-    {
-        // 向前查找上一個句點或 paragraph 開始
-        var searchStart = Math.Max(0, periodPos - 1000); // 限制搜尋範圍
-        var prevPeriod = text.LastIndexOf('.', periodPos - 1);
-        if (prevPeriod >= 0)
-        {
-            // 找到上一個句點，sentence 開始於該句點後
-            var afterPrevPeriod = prevPeriod + 1;
-            // 跳過空白和換行
-            while (afterPrevPeriod < periodPos && afterPrevPeriod < text.Length && char.IsWhiteSpace(text[afterPrevPeriod]))
-                afterPrevPeriod++;
-            
-            // 檢查是否在註解行中，如果是，跳過註解行找到真正的 sentence 開始
-            var currentPos = afterPrevPeriod;
-            while (currentPos < periodPos && currentPos < text.Length)
-            {
-                // 找到當前行的開始
-                var lineStart = currentPos;
-                while (lineStart > 0 && text[lineStart - 1] != '\n' && text[lineStart - 1] != '\r')
-                    lineStart--;
-                
-                // 取得當前行的文字
-                var lineEnd = currentPos;
-                while (lineEnd < text.Length && text[lineEnd] != '\n' && text[lineEnd] != '\r')
-                    lineEnd++;
-                
-                var lineText = text.Substring(lineStart, lineEnd - lineStart).TrimStart();
-                
-                // 如果是註解行，跳過它
-                if (lineText.StartsWith("*>", StringComparison.Ordinal) || 
-                    (lineText.StartsWith("*", StringComparison.Ordinal) && lineText.Length > 0 && lineText[0] == '*' && !lineText.StartsWith("**", StringComparison.Ordinal)))
-                {
-                    // 跳過註解行，繼續到下一個非空白行
-                    currentPos = lineEnd + 1;
-                    while (currentPos < periodPos && currentPos < text.Length && char.IsWhiteSpace(text[currentPos]))
-                        currentPos++;
-                    continue;
-                }
-                
-                // 找到非註解行，這就是 sentence 的開始
-                return currentPos;
-            }
-            
-            return afterPrevPeriod;
-        }
-        return searchStart;
-    }
-
-    /// <summary>從文字手動解析語句（使用 regex 識別常見語句類型）</summary>
-    private StatementNode? ParseStatementFromText(string sentenceText, string? originalSentenceText = null)
-    {
-        if (string.IsNullOrWhiteSpace(sentenceText)) return null;
-        
-        var trimmed = sentenceText.Trim();
-        if (trimmed.Length == 0) return null;
-        
-        // 識別語句類型
-        string? statementType = null;
-        if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*DISPLAY\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "DISPLAY";
-        else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*MOVE\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "MOVE";
-        else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*PERFORM\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "PERFORM";
-        else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*IF\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "IF";
-        else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*CALL\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "CALL";
-        else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*ACCEPT\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "ACCEPT";
-        else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\s*READ\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            statementType = "READ";
-        
-        if (statementType == null) return null;
-        
-        // 確保 text 包含完整的語句（包括句點）
-        // 優先使用 originalSentenceText（如果提供），否則使用 sentenceText
-        var finalText = originalSentenceText != null ? originalSentenceText.Trim() : trimmed;
-        if (!finalText.EndsWith(".", StringComparison.Ordinal) && sentenceText.EndsWith(".", StringComparison.Ordinal))
-        {
-            finalText = sentenceText.Trim();
-        }
-        
-        var node = new StatementNode { StatementType = statementType, Text = finalText };
-        
-        // 對 DISPLAY 語句進行結構化解析
-        if (statementType == "DISPLAY")
-        {
-            EnrichDisplayFromText(node);
-            EnrichDisplayProperties(node);
-        }
-        
-        return node;
     }
 
     private static string? GetText(IParseTree? node) => node?.GetText()?.Trim();
@@ -2231,243 +1471,6 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         return t;
     }
 
-    /// <summary>從 continuation 文字解析 ScreenDescriptionEntry（當 grammar 將 entry 解析為 continuation 時）。</summary>
-    private ScreenDescriptionItemNode? ParseScreenEntryFromContinuation(string text)
-    {
-        // 解析 "03 S-RCB1-Fr-1, Frame," 或 "03S-RCB1-Fr-1Frame," 格式（parser 可能會移除空格）
-        // 1. 提取 level（開頭的數字，如 "03"）
-        // 2. 提取 name（level 後的 identifier，如 "S-RCB1-Fr-1"）
-        // 3. 提取 GuiType（Frame, Label, Grid 等）
-
-        var item = new ScreenDescriptionItemNode();
-        var trimmed = text.Trim();
-
-        // 提取 level（開頭的數字）
-        var levelEnd = 0;
-        while (levelEnd < trimmed.Length && char.IsDigit(trimmed[levelEnd]))
-        {
-            levelEnd++;
-        }
-        if (levelEnd == 0) return null; // 不是以數字開頭
-
-        var levelStr = trimmed.Substring(0, levelEnd);
-        item.Level = levelStr;
-
-        // 跳過空格和逗號
-        var nameStart = levelEnd;
-        while (nameStart < trimmed.Length && (trimmed[nameStart] == ' ' || trimmed[nameStart] == ','))
-        {
-            nameStart++;
-        }
-
-        // 提取 name（直到遇到逗號或關鍵字）
-        var nameEnd = nameStart;
-        var guiTypeKeywords = new[] { "Frame", "Label", "Grid" };
-        var foundGuiType = false;
-
-        // 尋找 GuiType 關鍵字的位置
-        var upperText = trimmed.ToUpperInvariant();
-        foreach (var keyword in guiTypeKeywords)
-        {
-            var keywordUpper = keyword.ToUpperInvariant();
-            var keywordIndex = upperText.IndexOf(keywordUpper, nameStart, StringComparison.Ordinal);
-            if (keywordIndex >= nameStart)
-            {
-                // 找到關鍵字，name 結束於關鍵字前
-                nameEnd = keywordIndex;
-                item.GuiType = keyword;
-                foundGuiType = true;
-                break;
-            }
-        }
-
-        // 如果沒找到關鍵字，name 結束於第一個逗號
-        if (!foundGuiType)
-        {
-            var commaIndex = trimmed.IndexOf(',', nameStart);
-            if (commaIndex > nameStart)
-            {
-                nameEnd = commaIndex;
-            }
-            else
-            {
-                nameEnd = trimmed.Length;
-            }
-        }
-
-        // 提取 name
-        if (nameEnd > nameStart)
-        {
-            item.Name = trimmed.Substring(nameStart, nameEnd - nameStart).Trim();
-        }
-
-        // 如果還沒找到 GuiType，再次嘗試（可能在 name 之後）
-        if (!foundGuiType)
-        {
-            var remaining = trimmed.Substring(nameEnd).ToUpperInvariant();
-            foreach (var keyword in guiTypeKeywords)
-            {
-                if (remaining.Contains(keyword.ToUpperInvariant()))
-                {
-                    item.GuiType = keyword;
-                    break;
-                }
-            }
-        }
-
-        Console.Error.WriteLine($"[SCREEN] ParseScreenEntryFromContinuation: level={item.Level}, name={item.Name}, guiType={item.GuiType ?? "null"}");
-        return item;
-    }
-
-    /// <summary>解析 continuation 文字為 key-value pairs。</summary>
-    private static Dictionary<string, string> ParseGuiProperties(string text)
-    {
-        var properties = new Dictionary<string, string>();
-        
-        // 智能分割：考慮括號和引號，只在外層分割逗號
-        var parts = SplitRespectingParentheses(text);
-
-        foreach (var part in parts)
-        {
-            var trimmed = part.Trim();
-            if (string.IsNullOrEmpty(trimmed)) continue;
-
-            // 特殊處理：EXCEPTION PROCEDURE（parser 可能會移除空格，變成 EXCEPTIONPROCEDURE 或 EXCEPTIONPROCEDURES）
-            var upperTrimmed = trimmed.ToUpperInvariant();
-            if (upperTrimmed.StartsWith("EXCEPTIONPROCEDURE", StringComparison.OrdinalIgnoreCase) 
-                || upperTrimmed.StartsWith("EXCEPTION PROCEDURE", StringComparison.OrdinalIgnoreCase))
-            {
-                // 找到 "PROCEDURE" 的位置
-                var procedureIndex = upperTrimmed.IndexOf("PROCEDURE", StringComparison.OrdinalIgnoreCase);
-                if (procedureIndex >= 0)
-                {
-                    var value = trimmed.Substring(procedureIndex + "PROCEDURE".Length).Trim();
-                    // 移除句點
-                    if (value.EndsWith(".")) value = value.Substring(0, value.Length - 1).Trim();
-                    // 如果 value 以 S- 開頭（identifier），提取它
-                    if (value.StartsWith("S-", StringComparison.OrdinalIgnoreCase) || value.StartsWith("S", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // value 已經是正確的 identifier
-                    }
-                    properties["EXCEPTION PROCEDURE"] = value;
-                    continue;
-                }
-            }
-
-            // 檢測是否為新 entry（以兩位數字開頭，如 "03 S-RCB1-Fr-1"）
-            // 注意：屬性名稱也可能以數字開頭（如 "3-D"），需要區分
-            if (trimmed.Length >= 2 && char.IsDigit(trimmed[0]) && char.IsDigit(trimmed[1]))
-            {
-                // 檢查是否為 level number（如 "03"）後面跟著空格和 identifier
-                // 格式：兩位數字 + 空格/逗號 + identifier（如 "S-RCB1-Fr-1"）
-                var afterLevel = trimmed.Substring(2).TrimStart(',', ' ');
-                if (afterLevel.Length > 0 && (char.IsLetter(afterLevel[0]) || afterLevel[0] == 'S' || afterLevel[0] == 's'))
-                {
-                    // 這是新 entry，不處理（會在 VisitScreenDescriptionEntry 中處理）
-                    continue;
-                }
-            }
-
-            // 嘗試拆分為 key-value（以第一個空格為分隔）
-            var spaceIndex = trimmed.IndexOf(' ');
-            if (spaceIndex > 0)
-            {
-                var key = trimmed.Substring(0, spaceIndex).Trim();
-                var value = trimmed.Substring(spaceIndex + 1).Trim();
-                
-                // 移除 value 開頭的 "IS "（如果有的話）
-                if (value.StartsWith("IS ", StringComparison.OrdinalIgnoreCase))
-                {
-                    value = value.Substring(3).Trim();
-                }
-                
-                // 移除句點（如果有的話）
-                if (value.EndsWith(".")) value = value.Substring(0, value.Length - 1).Trim();
-
-                // Key 中包含空格時用底線替換（但 EXCEPTION PROCEDURE 已特殊處理）
-                if (key.Contains(' '))
-                {
-                    key = key.Replace(' ', '_');
-                }
-
-                properties[key] = value;
-            }
-            else
-            {
-                // 無法拆分，作為 key，value 為 "True"
-                var key = trimmed.TrimEnd('.');
-                properties[key] = "True";
-            }
-        }
-
-        return properties;
-    }
-
-    /// <summary>智能分割文字，考慮括號和引號，只在外層分割逗號。</summary>
-    private static List<string> SplitRespectingParentheses(string text)
-    {
-        var parts = new List<string>();
-        var currentPart = new StringBuilder();
-        int openParens = 0;
-        bool inQuotes = false;
-        char quoteChar = '\0';
-
-        foreach (var ch in text)
-        {
-            if (!inQuotes)
-            {
-                if (ch == '(')
-                {
-                    openParens++;
-                    currentPart.Append(ch);
-                }
-                else if (ch == ')')
-                {
-                    openParens--;
-                    currentPart.Append(ch);
-                }
-                else if (ch == '"' || ch == '\'')
-                {
-                    inQuotes = true;
-                    quoteChar = ch;
-                    currentPart.Append(ch);
-                }
-                else if (ch == ',' && openParens == 0)
-                {
-                    // 外層逗號，分割
-                    var part = currentPart.ToString().Trim();
-                    if (!string.IsNullOrEmpty(part))
-                    {
-                        parts.Add(part);
-                    }
-                    currentPart.Clear();
-                }
-                else
-                {
-                    currentPart.Append(ch);
-                }
-            }
-            else
-            {
-                currentPart.Append(ch);
-                if (ch == quoteChar)
-                {
-                    inQuotes = false;
-                    quoteChar = '\0';
-                }
-            }
-        }
-
-        // 添加最後一部分
-        var lastPart = currentPart.ToString().Trim();
-        if (!string.IsNullOrEmpty(lastPart))
-        {
-            parts.Add(lastPart);
-        }
-
-        return parts;
-    }
-
     /// <summary>從 VALUE 子句取第一個區間的實際值，供 78/88 使用（如 VALUE 1 → "1", VALUE ZERO → "0"）。</summary>
     private static string? GetRealValueFromValueClause(Cobol85AcuParser.DataValueClauseContext clause)
     {
@@ -2491,623 +1494,4 @@ public class CobolAstVisitor : Cobol85AcuBaseVisitor<object?>
         return s;
     }
 
-    /// <summary>從原始 COBOL 文字填充 ScreenDescriptionItemNode 的 guiProperties（後處理 continuation lines）。</summary>
-    private void FillScreenItemPropertiesFromSource(ScreenSectionNode section)
-    {
-        if (string.IsNullOrEmpty(_cobolSource)) return;
-
-        var lines = _cobolSource.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
-        
-        // 找到 SCREEN SECTION 的起始行
-        var screenSectionStartLine = FindScreenSectionStartLine(lines);
-        if (screenSectionStartLine < 0) return;
-
-        Console.Error.WriteLine($"[SCREEN] FillScreenItemPropertiesFromSource: SCREEN SECTION 起始行 {screenSectionStartLine}");
-
-        // 遍歷所有 ScreenDescriptionItemNode（遞迴處理 children）
-        FillScreenItemPropertiesRecursive(section.Children, lines, screenSectionStartLine, section);
-    }
-
-    private int FindScreenSectionStartLine(string[] lines)
-    {
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i].Trim();
-            // 跳過註解行
-            if (line.StartsWith("*") || line.StartsWith("*>"))
-                continue;
-            
-            // 尋找 SCREEN SECTION（不是註解）
-            if (line.Contains("SCREEN", StringComparison.OrdinalIgnoreCase) 
-                && line.Contains("SECTION", StringComparison.OrdinalIgnoreCase))
-            {
-                return i + 1; // 行號從 1 開始
-            }
-        }
-        return -1;
-    }
-
-    private void FillScreenItemPropertiesRecursive(List<AstNode> items, string[] lines, int startLine, ScreenSectionNode section)
-    {
-        if (items == null)
-        {
-            Console.Error.WriteLine("[SCREEN] FillScreenItemPropertiesRecursive: items 為 null");
-            return;
-        }
-
-        Console.Error.WriteLine($"[SCREEN] FillScreenItemPropertiesRecursive: 處理 {items.Count} 個 items");
-        
-        // 創建深層副本以避免在遍歷時修改集合導致的錯誤
-        // 使用索引遍歷而不是 foreach，以避免集合修改問題
-        var itemsToProcess = new List<ScreenDescriptionItemNode>();
-        for (int i = 0; i < items.Count; i++)
-        {
-            if (items[i] is ScreenDescriptionItemNode screenItem)
-            {
-                itemsToProcess.Add(screenItem);
-            }
-        }
-        
-        // 現在遍歷副本，即使原始集合被修改也不會有問題
-        foreach (var screenItem in itemsToProcess)
-        {
-            // 找到該 item 在原始文字中的行號
-            var itemLine = _screenItemLineNumbers.ContainsKey(screenItem)
-                ? _screenItemLineNumbers[screenItem]
-                : FindItemLineInSource(screenItem, lines, startLine);
-
-            Console.Error.WriteLine($"[SCREEN] FillScreenItemPropertiesRecursive: item level={screenItem.Level}, name={screenItem.Name}, 記錄的行號={(_screenItemLineNumbers.ContainsKey(screenItem) ? _screenItemLineNumbers[screenItem].ToString() : "無")}, 找到的行號={itemLine}");
-
-            if (itemLine > 0)
-            {
-                Console.Error.WriteLine($"[SCREEN] FillScreenItemPropertiesRecursive: 處理 item level={screenItem.Level}, name={screenItem.Name}, line={itemLine}");
-                // 提取 continuation lines 並解析，同時創建新發現的 entries
-                FillSingleScreenItemProperties(screenItem, lines, itemLine, section);
-            }
-            else
-            {
-                Console.Error.WriteLine($"[SCREEN] FillScreenItemPropertiesRecursive: 警告 - 無法找到 item level={screenItem.Level}, name={screenItem.Name} 的行號");
-            }
-
-            // 遞迴處理 children（創建副本以避免集合修改問題）
-            var childrenCopy = new List<AstNode>(screenItem.Children.Cast<AstNode>());
-            FillScreenItemPropertiesRecursive(childrenCopy, lines, startLine, section);
-        }
-    }
-
-    private int FindItemLineInSource(ScreenDescriptionItemNode item, string[] lines, int startLine)
-    {
-        // 從 SCREEN SECTION 開始尋找包含 item level 和 name 的行
-        // 優先使用記錄的行號
-        if (_screenItemLineNumbers.ContainsKey(item))
-        {
-            var recordedLine = _screenItemLineNumbers[item];
-            // 驗證該行是否包含 item name
-            if (recordedLine > 0 && recordedLine <= lines.Length)
-            {
-                var line = lines[recordedLine - 1].Trim();
-                if (line.Contains(item.Name))
-                {
-                    return recordedLine;
-                }
-            }
-        }
-        
-        // 如果記錄的行號無效，則搜尋
-        for (int i = startLine - 1; i < lines.Length; i++)
-        {
-            var line = lines[i].Trim();
-            if (string.IsNullOrEmpty(line) || line.StartsWith("*") || line.StartsWith("*>"))
-                continue;
-
-            // 檢測是否為 section 結束
-            if (line.Contains("PROCEDURE", StringComparison.OrdinalIgnoreCase) 
-                && line.Contains("DIVISION", StringComparison.OrdinalIgnoreCase))
-                break;
-
-            // 檢查是否包含 level 和 name
-            // level 可能是 "3" 或 "03"，需要匹配兩種格式
-            var levelStr = item.Level;
-            var levelStrPadded = int.TryParse(item.Level, out var levelNum) ? levelNum.ToString("00") : item.Level.PadLeft(2, '0');
-            if ((line.StartsWith(levelStr + " ") || line.StartsWith(levelStr + ",") || 
-                 line.StartsWith(levelStrPadded + " ") || line.StartsWith(levelStrPadded + ",")) 
-                && line.Contains(item.Name))
-            {
-                return i + 1; // 行號從 1 開始
-            }
-        }
-        return -1;
-    }
-
-    private void FillSingleScreenItemProperties(ScreenDescriptionItemNode item, string[] lines, int itemLine, ScreenSectionNode section)
-    {
-        // 讀取從 itemLine 開始的 continuation lines
-        // 直到下一個 entry（以數字開頭的行）或 section 結束
-        var continuationLines = new List<string>();
-        
-        // 先找到包含 item name 的行（不依賴行號，因為行號可能不一致）
-        int actualItemLineIndex = -1;
-        var levelStr = int.TryParse(item.Level, out var levelNum) ? levelNum.ToString("00") : item.Level.PadLeft(2, '0'); // "03"
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i].Trim();
-            if (string.IsNullOrEmpty(line) || line.StartsWith("*") || line.StartsWith("*>"))
-                continue;
-            
-            // 檢查是否包含 level 和 name
-            if ((line.StartsWith(levelStr + " ") || line.StartsWith(levelStr + ",")) 
-                && line.Contains(item.Name))
-            {
-                actualItemLineIndex = i;
-                Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 找到 item 行 {i + 1}: {line.Substring(0, Math.Min(80, line.Length))}");
-                break;
-            }
-        }
-        
-        if (actualItemLineIndex < 0)
-        {
-            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 警告 - 無法找到 item level={item.Level}, name={item.Name} 的行");
-            return;
-        }
-
-        // 從 entry 定義行的下一行開始收集 continuation lines
-        // 因為 entry 定義行本身已經在 VisitAcuScreenContinuation 中處理過了
-        for (int i = actualItemLineIndex + 1; i < lines.Length; i++)
-        {
-            var line = lines[i].Trim();
-            if (string.IsNullOrEmpty(line) || line.StartsWith("*") || line.StartsWith("*>"))
-            {
-                Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 行 {i + 1} 為空或註解，跳過");
-                continue;
-            }
-
-            // 檢測是否為新 entry（以 level 數字開頭，如 "01", "03" 等，且不是當前 item）
-            var trimmed = line.TrimStart();
-            int? detectedLevel = null;
-            bool isNewEntry = false;
-            
-            // 檢查是否以 level 數字開頭（1-2 位數字，後跟空格或逗號）
-            if (trimmed.Length >= 2 && char.IsDigit(trimmed[0]) && char.IsDigit(trimmed[1]))
-            {
-                // 可能是 level 01-99，檢查是否為新 entry
-                var twoDigitLevelStr = trimmed.Substring(0, 2);
-                if (int.TryParse(twoDigitLevelStr, out var level) && level >= 1 && level <= 99)
-                {
-                    // 檢查後續是否為空格或逗號（表示這是 level）
-                    if (trimmed.Length > 2 && (trimmed[2] == ' ' || trimmed[2] == ','))
-                    {
-                        // 檢查是否為當前 item 的 continuation（可能在同一行）
-                        if (!line.Contains(item.Name))
-                        {
-                            isNewEntry = true;
-                            detectedLevel = level;
-                            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 行 {i + 1} 為新 entry (level={level})，創建新 item。內容: {line.Substring(0, Math.Min(50, line.Length))}");
-                        }
-                    }
-                }
-            }
-            else if (trimmed.Length >= 1 && char.IsDigit(trimmed[0]))
-            {
-                // 單個數字開頭，可能是 level 1-9，但需要檢查後續字符
-                var singleLevelStr = trimmed.Substring(0, 1);
-                if (int.TryParse(singleLevelStr, out var level) && level >= 1 && level <= 9)
-                {
-                    // 檢查後續是否為空格或逗號（表示這是 level）
-                    if (trimmed.Length > 1 && (trimmed[1] == ' ' || trimmed[1] == ','))
-                    {
-                        if (!line.Contains(item.Name))
-                        {
-                            isNewEntry = true;
-                            detectedLevel = level;
-                            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 行 {i + 1} 為新 entry (level={level})，創建新 item。內容: {line.Substring(0, Math.Min(50, line.Length))}");
-                        }
-                    }
-                }
-            }
-            
-            if (isNewEntry && detectedLevel.HasValue)
-            {
-                // 檢查是否已經存在這個 item（避免重複創建）
-                // 遞迴檢查整個 AST 樹
-                bool ItemExists(ScreenDescriptionItemNode checkItem, ScreenDescriptionItemNode? rootItem, ScreenSectionNode section)
-                {
-                    // 檢查 section 的直接 children
-                    foreach (var astItem in section.Children)
-                    {
-                        if (astItem is ScreenDescriptionItemNode screenItem)
-                        {
-                            if (screenItem.Level == checkItem.Level && screenItem.Name == checkItem.Name)
-                                return true;
-                            // 遞迴檢查子樹
-                            if (ItemExistsInSubtree(checkItem, screenItem))
-                                return true;
-                        }
-                    }
-                    return false;
-                }
-
-                bool ItemExistsInSubtree(ScreenDescriptionItemNode checkItem, ScreenDescriptionItemNode parent)
-                {
-                    foreach (var child in parent.Children)
-                    {
-                        if (child.Level == checkItem.Level && child.Name == checkItem.Name)
-                            return true;
-                        if (ItemExistsInSubtree(checkItem, child))
-                            return true;
-                    }
-                    return false;
-                }
-
-                // 創建新 entry
-                var newItem = CreateScreenItemFromLine(line, i + 1, detectedLevel.Value);
-                if (newItem != null && !string.IsNullOrEmpty(newItem.Name))
-                {
-                    // 檢查是否已存在（檢查整個 AST 樹）
-                    if (ItemExists(newItem, item, section))
-                    {
-                        Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: item level={newItem.Level}, name={newItem.Name} 已存在，跳過創建");
-                    }
-                    else
-                    {
-                        // 解析 entry 定義行本身可能包含的屬性（在 name 和 guiType 之後）
-                        var entryLineTrimmed = line.Trim();
-                        var nameAndGuiTypeEnd = entryLineTrimmed.IndexOf(newItem.Name, StringComparison.OrdinalIgnoreCase);
-                        if (nameAndGuiTypeEnd >= 0)
-                        {
-                            nameAndGuiTypeEnd += newItem.Name.Length;
-                            // 跳過 guiType（如果有的話）
-                            if (!string.IsNullOrEmpty(newItem.GuiType))
-                            {
-                                var guiTypeIndex = entryLineTrimmed.IndexOf(newItem.GuiType, nameAndGuiTypeEnd, StringComparison.OrdinalIgnoreCase);
-                                if (guiTypeIndex >= nameAndGuiTypeEnd)
-                                {
-                                    nameAndGuiTypeEnd = guiTypeIndex + newItem.GuiType.Length;
-                                }
-                            }
-                            // 跳過逗號和空格
-                            while (nameAndGuiTypeEnd < entryLineTrimmed.Length && (entryLineTrimmed[nameAndGuiTypeEnd] == ',' || entryLineTrimmed[nameAndGuiTypeEnd] == ' '))
-                                nameAndGuiTypeEnd++;
-                            
-                            // 如果還有內容，解析為屬性
-                            if (nameAndGuiTypeEnd < entryLineTrimmed.Length)
-                            {
-                                var remainingProperties = entryLineTrimmed.Substring(nameAndGuiTypeEnd);
-                                var parsedProperties = ParseGuiProperties(remainingProperties);
-                                foreach (var kvp in parsedProperties)
-                                {
-                                    if (!newItem.GuiProperties.ContainsKey(kvp.Key))
-                                    {
-                                        newItem.GuiProperties[kvp.Key] = kvp.Value;
-                                        Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 從 entry 定義行解析屬性 {kvp.Key}={kvp.Value}");
-                                    }
-                                }
-                            }
-                        }
-
-                        // 找到正確的 parent
-                        var parent = FindParentForScreenItem(newItem, item, section);
-                        if (parent != null)
-                        {
-                            parent.Children.Add(newItem);
-                            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 新 item level={newItem.Level}, name={newItem.Name} 已加入 parent level={parent.Level}, name={parent.Name}");
-                            
-                            // 遞迴處理新 item 的 continuation lines
-                            FillSingleScreenItemProperties(newItem, lines, i + 1, section);
-                        }
-                        else
-                        {
-                            // 無 parent，加入 section
-                            section.Children.Add(newItem);
-                            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 新 item level={newItem.Level}, name={newItem.Name} 已加入 section");
-                            
-                            // 遞迴處理新 item 的 continuation lines
-                            FillSingleScreenItemProperties(newItem, lines, i + 1, section);
-                        }
-                    }
-                }
-                // 繼續處理當前 item 的 continuation lines（新 entry 已經被處理）
-                break;
-            }
-
-            // 檢測是否為 section 結束
-            if (line.Contains("PROCEDURE", StringComparison.OrdinalIgnoreCase) 
-                && line.Contains("DIVISION", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 行 {i + 1} 為 section 結束，停止收集");
-                break;
-            }
-
-            continuationLines.Add(line);
-            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 收集行 {i + 1}: {line.Substring(0, Math.Min(50, line.Length))}");
-        }
-
-        Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 共收集 {continuationLines.Count} 行 continuation lines");
-
-        // 合併包含未閉合括號的行
-        var mergedLines = MergeContinuationLinesWithParentheses(continuationLines);
-
-        // 解析 continuation lines 為 key-value pairs
-        foreach (var line in mergedLines)
-        {
-            // 跳過 entry 定義行（已在 VisitAcuScreenContinuation 中處理）
-            var trimmed = line.TrimStart();
-            if (trimmed.StartsWith(item.Level) && trimmed.Contains(item.Name))
-            {
-                // 這是 entry 定義行，可能包含 GuiType（Frame, Label 等）
-                // 但 properties 應該在後續行
-                Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 跳過 entry 定義行: {line.Substring(0, Math.Min(50, line.Length))}");
-                continue;
-            }
-
-            // 解析 continuation line
-            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 解析行: {line.Substring(0, Math.Min(80, line.Length))}");
-            var parsedProperties = ParseGuiProperties(line);
-            Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 解析出 {parsedProperties.Count} 個屬性");
-            foreach (var kvp in parsedProperties)
-            {
-                // 如果 key 已存在，跳過（避免覆蓋）
-                if (!item.GuiProperties.ContainsKey(kvp.Key))
-                {
-                    item.GuiProperties[kvp.Key] = kvp.Value;
-                    Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 添加屬性 {kvp.Key}={kvp.Value}");
-                }
-                else
-                {
-                    Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 屬性 {kvp.Key} 已存在，跳過");
-                }
-            }
-        }
-
-        Console.Error.WriteLine($"[SCREEN] FillSingleScreenItemProperties: 完成，item level={item.Level}, name={item.Name}, guiProperties.Count={item.GuiProperties.Count}");
-    }
-
-    /// <summary>合併包含未閉合括號的 continuation lines。</summary>
-    private static List<string> MergeContinuationLinesWithParentheses(List<string> lines)
-    {
-        var merged = new List<string>();
-        var currentLine = new StringBuilder();
-        int openParens = 0;
-        bool inQuotes = false;
-        char quoteChar = '\0';
-
-        for (int i = 0; i < lines.Count; i++)
-        {
-            var line = lines[i];
-            var trimmed = line.Trim();
-            if (string.IsNullOrEmpty(trimmed))
-            {
-                if (currentLine.Length > 0)
-                {
-                    currentLine.Append(" ");
-                }
-                continue;
-            }
-
-            // 追蹤括號和引號
-            foreach (var ch in trimmed)
-            {
-                if (!inQuotes)
-                {
-                    if (ch == '(')
-                        openParens++;
-                    else if (ch == ')')
-                        openParens--;
-                    else if (ch == '"' || ch == '\'')
-                    {
-                        inQuotes = true;
-                        quoteChar = ch;
-                    }
-                }
-                else
-                {
-                    if (ch == quoteChar)
-                    {
-                        inQuotes = false;
-                        quoteChar = '\0';
-                    }
-                }
-            }
-
-            if (currentLine.Length > 0)
-                currentLine.Append(" ");
-            currentLine.Append(trimmed);
-
-            // 如果所有括號和引號都已閉合，則完成當前行
-            if (openParens == 0 && !inQuotes)
-            {
-                // 如果行以逗號或句點結尾，或者是最後一行，則完成
-                bool shouldComplete = trimmed.EndsWith(",") || trimmed.EndsWith(".") || (i == lines.Count - 1);
-                
-                // 或者檢查下一行是否以字母開頭（可能是新屬性）
-                if (!shouldComplete && i < lines.Count - 1)
-                {
-                    var nextLine = lines[i + 1].Trim();
-                    if (!string.IsNullOrEmpty(nextLine) && char.IsLetter(nextLine[0]))
-                    {
-                        // 下一行以字母開頭，可能是新屬性，完成當前行
-                        shouldComplete = true;
-                    }
-                }
-                
-                if (shouldComplete)
-                {
-                    merged.Add(currentLine.ToString());
-                    currentLine.Clear();
-                    openParens = 0;
-                    inQuotes = false;
-                    quoteChar = '\0';
-                }
-            }
-        }
-
-        // 添加剩餘的行（如果有的話）
-        if (currentLine.Length > 0)
-        {
-            merged.Add(currentLine.ToString());
-        }
-
-        return merged;
-    }
-
-    /// <summary>從原始文字行創建 ScreenDescriptionItemNode。
-    /// 更新時間：2026-02-09 16:22
-    /// 作者：AI Assistant
-    /// 摘要：修改為從原始字符串提取 level，保留前導零（如 "03" 而不是 "3"）
-    /// </summary>
-    private ScreenDescriptionItemNode? CreateScreenItemFromLine(string line, int lineNumber, int detectedLevel)
-    {
-        var trimmed = line.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-            return null;
-
-        // 使用 ParseScreenEntryFromContinuation 的邏輯來解析
-        var item = ParseScreenEntryFromContinuation(trimmed);
-        if (item == null)
-        {
-            // 如果 ParseScreenEntryFromContinuation 失敗，嘗試手動解析
-            // 從原始字符串提取 level，保留前導零（如 "03"）
-            var levelStr = "";
-            var nameStart = 0;
-            while (nameStart < trimmed.Length && char.IsDigit(trimmed[nameStart]))
-            {
-                levelStr += trimmed[nameStart];
-                nameStart++;
-            }
-            
-            // 如果沒有提取到 level，使用 detectedLevel（但格式化為兩位數）
-            if (string.IsNullOrEmpty(levelStr))
-            {
-                levelStr = detectedLevel.ToString("00");
-            }
-            
-            item = new ScreenDescriptionItemNode { Level = levelStr };
-            while (nameStart < trimmed.Length && (trimmed[nameStart] == ' ' || trimmed[nameStart] == ','))
-                nameStart++;
-
-            // 提取 name（直到遇到逗號或關鍵字）
-            var nameEnd = nameStart;
-            var guiTypeKeywords = new[] { "Frame", "Label", "Grid" };
-            var foundGuiType = false;
-            var upperText = trimmed.ToUpperInvariant();
-            
-            foreach (var keyword in guiTypeKeywords)
-            {
-                var keywordUpper = keyword.ToUpperInvariant();
-                var keywordIndex = upperText.IndexOf(keywordUpper, nameStart, StringComparison.Ordinal);
-                if (keywordIndex >= nameStart)
-                {
-                    nameEnd = keywordIndex;
-                    item.GuiType = keyword;
-                    foundGuiType = true;
-                    break;
-                }
-            }
-
-            if (!foundGuiType)
-            {
-                var commaIndex = trimmed.IndexOf(',', nameStart);
-                if (commaIndex > nameStart)
-                    nameEnd = commaIndex;
-                else
-                    nameEnd = trimmed.Length;
-            }
-
-            if (nameEnd > nameStart)
-            {
-                item.Name = trimmed.Substring(nameStart, nameEnd - nameStart).Trim();
-            }
-
-            // 如果還沒找到 GuiType，再次嘗試
-            if (!foundGuiType)
-            {
-                var remaining = trimmed.Substring(nameEnd).ToUpperInvariant();
-                foreach (var keyword in guiTypeKeywords)
-                {
-                    if (remaining.Contains(keyword.ToUpperInvariant()))
-                    {
-                        item.GuiType = keyword;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (item != null && !string.IsNullOrEmpty(item.Name))
-        {
-            // 記錄行號和原始文字
-            _screenItemLineNumbers[item] = lineNumber;
-            _screenItemRawText[item] = line;
-            Console.Error.WriteLine($"[SCREEN] CreateScreenItemFromLine: 創建 item level={item.Level}, name={item.Name}, guiType={item.GuiType ?? "null"}, line={lineNumber}");
-        }
-
-        return item;
-    }
-
-    /// <summary>比較兩個 level 字符串（"01", "03", "05" 等）。</summary>
-    private static int CompareLevels(string level1, string level2)
-    {
-        if (int.TryParse(level1, out var l1) && int.TryParse(level2, out var l2))
-        {
-            return l1.CompareTo(l2);
-        }
-        return string.Compare(level1, level2, StringComparison.Ordinal);
-    }
-
-    /// <summary>根據 level 找到正確的 parent。</summary>
-    private ScreenDescriptionItemNode? FindParentForScreenItem(ScreenDescriptionItemNode newItem, ScreenDescriptionItemNode currentItem, ScreenSectionNode section)
-    {
-        // 如果新 item 的 level > 當前 item 的 level，則當前 item 為 parent
-        if (CompareLevels(newItem.Level, currentItem.Level) > 0)
-        {
-            Console.Error.WriteLine($"[SCREEN] FindParentForScreenItem: 新 item level={newItem.Level} > 當前 item level={currentItem.Level}，parent 為當前 item");
-            return currentItem;
-        }
-
-        // 如果新 item 的 level <= 當前 item 的 level，需要向上找到正確的 parent
-        // 從 section 開始，遞迴搜尋包含 currentItem 的路徑，建立路徑列表
-        List<ScreenDescriptionItemNode>? path = null;
-        
-        bool FindPath(List<AstNode> items, ScreenDescriptionItemNode target, List<ScreenDescriptionItemNode> currentPath)
-        {
-            foreach (var item in items)
-            {
-                if (item is ScreenDescriptionItemNode screenItem)
-                {
-                    var newPath = new List<ScreenDescriptionItemNode>(currentPath) { screenItem };
-                    
-                    if (screenItem == target)
-                    {
-                        path = newPath;
-                        return true;
-                    }
-                    
-                    if (FindPath(screenItem.Children.Cast<AstNode>().ToList(), target, newPath))
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        if (FindPath(section.Children, currentItem, new List<ScreenDescriptionItemNode>()))
-        {
-            // 從路徑的末尾向前搜尋，找到第一個 level < newItem.Level 的 item
-            if (path != null)
-            {
-                for (int i = path.Count - 1; i >= 0; i--)
-                {
-                    if (CompareLevels(path[i].Level, newItem.Level) < 0)
-                    {
-                        Console.Error.WriteLine($"[SCREEN] FindParentForScreenItem: 找到 parent level={path[i].Level}, name={path[i].Name}");
-                        return path[i];
-                    }
-                }
-            }
-        }
-
-        // 如果找不到合適的 parent，返回 null（將加入 section）
-        Console.Error.WriteLine($"[SCREEN] FindParentForScreenItem: 未找到合適的 parent，將加入 section");
-        return null;
-    }
 }

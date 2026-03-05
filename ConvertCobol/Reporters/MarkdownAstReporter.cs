@@ -97,6 +97,8 @@ public class MarkdownAstReporter
             if (!string.IsNullOrEmpty(item.Redefines))
                 line += "  [REDEFINES]";
             sb.AppendLine(line);
+            if (item.Children.Count > 0)
+                AppendDataItems(sb, item.Children, depth + 1);
         }
         if (items.Count > 100)
             sb.AppendLine($"... 還有 {items.Count - 100} 個項目");

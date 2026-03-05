@@ -6,6 +6,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ConvertCobol.Converters;
 using ConvertCobol.Models;
 
 namespace ConvertCobol.Loaders;
@@ -17,7 +18,8 @@ public class AstJsonLoader
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true
+        AllowTrailingCommas = true,
+        Converters = { new StatementNodeJsonConverter() }
     };
 
     /// <summary>從 JSON 字串載入 ProgramAst</summary>

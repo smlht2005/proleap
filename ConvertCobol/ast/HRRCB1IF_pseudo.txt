@@ -1,0 +1,3539 @@
+PROCEDURE DIVISION.
+
+PARAGRAPH: Acu-Main-Logic
+    PERFORM Acu-Initial-Routine
+    PERFORM Acu-S-RCB1-Routine
+    PERFORM F-STOP-RTN
+
+PARAGRAPH: Acu-Extended-File-Status
+    CALL C$RERRNAME USING Acu-Err-File
+    CALL C$RERR USING Extend-Stat, Text-Message
+    MOVE Primary-Error TO Acu-Msg-Id
+    PERFORM Acu-Show-Msg
+
+PARAGRAPH: Acu-Show-Msg
+    MOVE SPACE TO Acu-Msg-1, Acu-Msg-2, Acu-Msg-3
+    EVALUATE Acu-Msg-Id
+        WHEN 10
+            MOVE "No more data."  TO Acu-Msg-1
+            MOVE Mb-Default-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 22
+            MOVE "Key duplication." TO Acu-Msg-1
+            MOVE Mb-Error-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 23
+            MOVE "Record not found." TO Acu-Msg-1
+            MOVE Mb-Warning-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 101
+            MOVE "Quit?" TO Acu-Msg-1
+            MOVE 4 TO Acu-Icon-Type
+            MOVE Mb-Yes-No TO Acu-Button-Type
+        WHEN 201
+            MOVE "Add Record?" TO Acu-Msg-1
+            MOVE 4 TO Acu-Icon-Type
+            MOVE Mb-Yes-No TO Acu-Button-Type
+        WHEN 202
+            MOVE "Update Record?" TO Acu-Msg-1
+            MOVE 4 TO Acu-Icon-Type
+            MOVE Mb-Yes-No TO Acu-Button-Type
+        WHEN 203
+            MOVE "Delete Record?" TO Acu-Msg-1
+            MOVE 4 TO Acu-Icon-Type
+            MOVE Mb-Yes-No TO Acu-Button-Type
+        WHEN 204
+            MOVE "Key duplication." TO Acu-Msg-1
+            MOVE Mb-Warning-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 301
+            MOVE "Add Successful." TO Acu-Msg-1
+            MOVE Mb-Default-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 302
+            MOVE "Update Successful." TO Acu-Msg-1
+            MOVE Mb-Default-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 303
+            MOVE "Delete Successful." TO Acu-Msg-1
+            MOVE Mb-Default-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 401
+            MOVE "Shell not found." TO Acu-Msg-1
+            MOVE Mb-Error-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN 901
+            MOVE Mb-Warning-Icon TO Acu-Icon-Type
+            MOVE Mb-Ok TO Acu-Button-Type
+        WHEN OTHER
+            MOVE Text-Message TO Acu-Msg-1
+            STRING "File:" Acu-Err-File DELIMITED BY SPACE
+           INTO Acu-Msg-2
+            STRING "File status ", Primary-Error "," Secondary-Error
+           DELIMITED BY SIZE INTO Acu-Msg-3
+    END-EVALUATE
+    PERFORM Acu-Message-Box
+
+PARAGRAPH: Acu-Message-Box
+    MOVE 1 TO Acu-Text-Ptr
+    IF Acu-Msg-1 NOT = SPACE
+        MOVE 0 TO Acu-Size
+        INSPECT Acu-Msg-1 TALLYING Acu-Size FOR TRAILING SPACE
+        STRING Acu-Msg-1( 1 : Acu-Length - Acu-Size )
+           DELIMITED BY SIZE
+           INTO Acu-Msg-Text, POINTER Acu-Text-Ptr
+    END-IF
+    IF Acu-Msg-2 NOT = SPACE
+        MOVE 0 TO Acu-Size
+        INSPECT Acu-Msg-2 TALLYING Acu-Size FOR TRAILING SPACE
+        IF ACU-Text-Ptr > 1
+           STRING X"0A" DELIMITED BY SIZE
+               INTO Acu-Msg-Text, POINTER Acu-Text-Ptr
+
+        END-IF
+        STRING Acu-Msg-2( 1 : Acu-Length - Acu-Size )
+            DELIMITED BY SIZE
+            INTO Acu-Msg-Text, POINTER Acu-Text-Ptr
+    END-IF
+    IF Acu-Msg-3 NOT = SPACE
+        MOVE 0 TO Acu-Size
+        INSPECT Acu-Msg-3 TALLYING Acu-Size FOR TRAILING SPACE
+        IF Acu-Text-Ptr > 1
+           STRING X"0A" DELIMITED BY SIZE
+               INTO Acu-Msg-Text, POINTER Acu-Text-Ptr
+        END-IF
+        STRING Acu-Msg-3( 1 : Acu-Length - Acu-Size )
+            DELIMITED BY SIZE
+            INTO Acu-Msg-Text, POINTER Acu-Text-Ptr
+    END-IF
+    IF Acu-Text-Ptr = 1
+        MOVE 0 TO Acu-Size
+        INSPECT Acu-Msg-Text TALLYING Acu-Size FOR TRAILING SPACE
+        COMPUTE Acu-Text-Ptr = Acu-Full-Len - Acu-Size + 1
+    END-IF
+    MOVE Low-Values TO Acu-Msg-Text(Acu-Text-Ptr:1)
+    DISPLAY DISPLAY MESSAGE BOX
+        Acu-Msg-Text
+        TYPE IS Acu-Button-Type
+        ICON IS Acu-Icon-Type
+        DEFAULT IS Acu-Default-Button
+        RETURNING Acu-Return-Value
+     .
+
+PARAGRAPH: Acu-Initial-Routine
+    ACCEPT System-Information FROM ENVIRONMENT System-Info
+    ACCEPT Terminal-Abilities FROM ENVIRONMENT Terminal-Info
+    PERFORM Acu-Init-Font
+
+PARAGRAPH: Acu-Init-Font
+    INITIALIZE WFONT-DATA, 細明體12
+    MOVE 12 TO WFONT-SIZE
+    MOVE "細明體" TO WFONT-NAME
+    SET WFCHARSET-DONT-CARE TO TRUE
+    SET WFONT-BOLD TO FALSE
+    SET WFONT-ITALIC TO FALSE
+    SET WFONT-UNDERLINE TO FALSE
+    SET WFONT-STRIKEOUT TO FALSE
+    SET WFFAMILY-DONT-CARE TO TRUE
+    SET WFONT-FIXED-PITCH TO FALSE
+    CALL W$FONT USING WFONT-GET-FONT, 細明體12, WFONT-DATA
+    INITIALIZE WFONT-DATA, 細明體11
+    MOVE 11 TO WFONT-SIZE
+    MOVE "細明體" TO WFONT-NAME
+    SET WFCHARSET-DONT-CARE TO TRUE
+    SET WFONT-BOLD TO FALSE
+    SET WFONT-ITALIC TO FALSE
+    SET WFONT-UNDERLINE TO FALSE
+    SET WFONT-STRIKEOUT TO FALSE
+    SET WFFAMILY-DONT-CARE TO TRUE
+    SET WFONT-FIXED-PITCH TO FALSE
+    CALL W$FONT USING WFONT-GET-FONT, 細明體11, WFONT-DATA
+
+PARAGRAPH: Acu-Exit-Rtn
+    EXIT PROGRAM
+    STOP RUN
+
+PARAGRAPH: Acu-S-RCB1-Routine
+    PERFORM Acu-S-RCB1-Scrn
+    PERFORM Acu-S-RCB1-Proc
+
+PARAGRAPH: Acu-S-HT-DATA-Routine
+    PERFORM Acu-S-HT-DATA-Scrn
+    PERFORM Acu-S-HT-DATA-Proc
+
+PARAGRAPH: Acu-S-RCB1-Scrn
+    PERFORM Acu-S-RCB1-Create-Win
+    PERFORM Acu-S-RCB1-Init-Data
+
+PARAGRAPH: Acu-S-HT-DATA-Scrn
+    PERFORM Acu-S-HT-DATA-Create-Win
+    PERFORM Acu-S-HT-DATA-Init-Data
+
+PARAGRAPH: Acu-S-RCB1-Create-Win
+    PERFORM F-RCB1-Bef-Create
+    CONTINUE
+    PERFORM Acu-S-RCB1-Mn-1-Menu
+    MOVE Menu-Handle TO S-RCB1-Mn-1-Handle
+    CALL W$MENU USING Wmenu-Show, S-RCB1-Mn-1-Handle
+    DISPLAY DISPLAY S-RCB1 UPON S-RCB1-Handle
+     PERFORM F-RCB1-Aft-Create
+     .
+    PERFORM F-RCB1-Aft-Create
+
+PARAGRAPH: Acu-S-HT-DATA-Create-Win
+    CONTINUE
+    DISPLAY DISPLAY S-HT-DATA UPON S-HT-DATA-Handle
+*>     After-Create
+     .
+
+PARAGRAPH: Acu-S-RCB1-Init-Data
+    PERFORM Acu-S-RCB1-Gd-1-Content
+    PERFORM F-RCB1-Aft-Initdata
+
+PARAGRAPH: Acu-S-HT-DATA-Init-Data
+    PERFORM F-HT-DATA-Aft-Initdata
+
+PARAGRAPH: Acu-S-RCB1-Proc
+    PERFORM UNTIL Exit-Pushed
+        ACCEPT S-RCB1
+           ON EXCEPTION PERFORM Acu-S-RCB1-Evaluate-Func
+        END-ACCEPT
+    END-PERFORM
+    DESTROY S-RCB1-Handle
+    INITIALIZE Key-Status
+
+PARAGRAPH: Acu-S-HT-DATA-Proc
+    PERFORM UNTIL Exit-Pushed
+        ACCEPT S-HT-DATA
+           ON EXCEPTION PERFORM Acu-S-HT-DATA-Evaluate-Func
+        END-ACCEPT
+    END-PERFORM
+    DESTROY S-HT-DATA-Handle
+    INITIALIZE Key-Status
+
+PARAGRAPH: Acu-S-RCB1-Gd-1-Content
+    MODIFY S-RCB1-Gd-1, X = 1, Y = 1, CELL-DATA = "序",
+    MODIFY S-RCB1-Gd-1, X = 2, Y = 1, CELL-DATA = "處置名稱",
+    MODIFY S-RCB1-Gd-1, X = 6, Y = 1, CELL-DATA = "數量",
+    MODIFY S-RCB1-Gd-1, X = 7, Y = 1, CELL-DATA = "處方日-時間",
+    MODIFY S-RCB1-Gd-1, X = 10, Y = 1, CELL-DATA =
+        "執行日-時間",
+    MODIFY S-RCB1-Gd-1, X = 1, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 2, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 3, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 4, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 5, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 6, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 7, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 8, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 9, COLUMN-FONT = 細明體11
+    MODIFY S-RCB1-Gd-1, X = 10, COLUMN-FONT = 細明體11
+
+PARAGRAPH: Acu-S-RCB1-Evaluate-Func
+    EVALUATE TRUE
+        WHEN Exit-Pushed
+            PERFORM Acu-S-RCB1-Exit
+        WHEN Event-Occurred
+            IF Event-Type = Cmd-Close
+              PERFORM Acu-S-RCB1-Exit
+           END-IF
+    END-EVALUATE
+    MOVE 1 TO Accept-Control
+
+PARAGRAPH: Acu-S-HT-DATA-Evaluate-Func
+    EVALUATE TRUE
+        WHEN Exit-Pushed
+            PERFORM Acu-S-HT-DATA-Exit
+        WHEN Event-Occurred
+            IF Event-Type = Cmd-Close
+              PERFORM Acu-S-HT-DATA-Exit
+           END-IF
+    END-EVALUATE
+    MOVE 1 TO Accept-Control
+
+PARAGRAPH: Acu-S-RCB1-Exit
+    SET Exit-Pushed TO TRUE
+
+PARAGRAPH: Acu-S-HT-DATA-Exit
+    SET Exit-Pushed TO TRUE
+
+PARAGRAPH: Acu-S-RCB1-Mn-1-Menu
+    PERFORM Acu-S-RCB1-Mn-1 THRU Acu-S-RCB1-Mn-1-Exit
+
+PARAGRAPH: Acu-S-RCB1-Mn-1
+    CALL W$MENU USING Wmenu-New
+    IF Menu-Handle = ZERO
+        GO TO Acu-S-RCB1-Mn-1-Exit
+    END-IF
+    CALL W$MENU USING Wmenu-New
+    IF Sub-Handle-1 = ZERO
+        MOVE ZERO TO Menu-Handle
+        GO TO Acu-S-RCB1-Mn-1-EXIT
+    END-IF
+    CALL W$MENU USING WMENU-ADD, Menu-Handle, 0, 0, "&1. 作業", 1000, Sub-Handle-1
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&1. 住院期間用藥明細查詢", W-RCB1
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&2. 住院期間檢驗放射線查詢", W-RCB2
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&3. 住院期間治療處置查詢", W-RCB3
+    CALL W$MENU USING Wmenu-New
+    IF Sub-Handle-1 = ZERO
+        MOVE ZERO TO Menu-Handle
+        GO TO Acu-S-RCB1-Mn-1-EXIT
+    END-IF
+    CALL W$MENU USING WMENU-ADD, Menu-Handle, 0, 0, "&2. 查詢", 1004, Sub-Handle-1
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&1. 查詢歷次住院記錄", W-SEARCH
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&2. 查詢已刪除藥品", W-DEL
+    CALL W$MENU USING Wmenu-New
+    IF Sub-Handle-1 = ZERO
+        MOVE ZERO TO Menu-Handle
+        GO TO Acu-S-RCB1-Mn-1-EXIT
+    END-IF
+    CALL W$MENU USING WMENU-ADD, Menu-Handle, 0, 0, "&3. 檢驗", 1007, Sub-Handle-1
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&1. 查詢檢驗報告", W-REPORT
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&2. 查詢簽收相關資料", W-DATA
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&3. 刪除", W-DELETE
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&4. 重印檢驗單(交科室)", W-PRINT
+    CALL W$MENU USING Wmenu-New
+    IF Sub-Handle-1 = ZERO
+        MOVE ZERO TO Menu-Handle
+        GO TO Acu-S-RCB1-Mn-1-EXIT
+    END-IF
+    CALL W$MENU USING WMENU-ADD, Menu-Handle, 0, 0, "&4. 離開", 1012, Sub-Handle-1
+    CALL W$MENU USING WMENU-ADD, Sub-Handle-1, 0, 0, "&1. 離開", W-EXIT
+
+PARAGRAPH: Acu-S-RCB1-Mn-1-Exit
+    MOVE ZERO TO Return-Code
+
+PARAGRAPH: S-RCB1-Exception-Proc
+    PERFORM F-RCB1-Ex-Other
+
+PARAGRAPH: S-RCB1-Gd-1-Event-Proc
+    EVALUATE Event-Type
+        WHEN Msg-Begin-Drag
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Begin-Drag
+        WHEN Msg-Begin-Entry
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Begin-Entry
+        WHEN Msg-Goto-Cell
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Goto-Cell
+        WHEN Msg-Goto-Cell-Mouse
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Goto-Cell-Mouse
+        WHEN Msg-Paged-Next
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Paged-Next
+        WHEN Msg-Paged-Nextpage
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Paged-Nextpage
+        WHEN Msg-Paged-Prev
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Paged-Prev
+        WHEN Msg-Paged-Prevpage
+            PERFORM F-RCB1-Gd-1-Ev-Msg-Paged-Prevpage
+    END-EVALUATE
+
+PARAGRAPH: S-HT-DATA-Exception-Proc
+    IF Event-Occurred
+        EVALUATE Event-Type
+    ELSE
+        PERFORM S-HT-DATA-Ex-Other
+    END-IF
+
+PARAGRAPH: F-RCB1-Bef-Create
+    INITIALIZE W-TOP-TITLE, W-TMP-PARA, W-HRDTA-COUNT, W-SOU, W-TMP-PACK-YN
+    MOVE 385 TO W-GD-COLOR
+    CALL C$NARG USING W-PARAMETERS
+    IF W-PARAMETERS = 1
+        MOVE "M" TO W-SOU
+        MOVE W-RUNL-CHK         TO W-RUN-CHK
+        MOVE W-RUN-PARA(1:1)    TO W-TMP-PARA
+        PERFORM F-OPEN-RTN THRU F-OPEN-EXIT
+    ELSE
+        IF W-HTCGUICF-EXT-PT-NO > 0 THEN
+                         MOVE "O" TO W-SOU
+                         MOVE W-RUNL-CHK         TO W-RUN-CHK
+                         MOVE W-RUN-PARA(1:1)    TO W-TMP-PARA
+                         PERFORM F-OPEN-RTN THRU F-OPEN-EXIT
+                 ELSE
+                         MOVE "S" TO W-SOU
+                         IF W-RUNE-OK = "Y" THEN
+                                 MOVE W-RUNE-CHK TO W-RUN-CHK(1:4500)
+                         ELSE
+                                 INITIALIZE W-RUN-CHK
+                         END-IF
+                         MOVE W-LNK2     TO W-TMP-PARA
+                 END-IF
+    END-IF
+    IF W-TMP-HZPAM(1:4) NOT = "    " AND LOW-VALUE
+        MOVE W-RUNE-CHK         TO W-RUN-CHK
+        MOVE W-TMP-HZPAM        TO L-PAM-LNK
+    ELSE
+        PERFORM F-CHK-LOG-RTN THRU F-CHK-LOG-EXIT
+        INITIALIZE W-TMP-HZPAM
+        IF   L-PAM-LOG-YN  = "Y"    THEN
+                         MOVE L-PAM-LNK    TO W-TMP-HZPAM
+                         MOVE "Y"        TO W-TMP-PACK-YN
+                 END-IF
+    END-IF
+    PERFORM F-HT-OPEN
+    PERFORM F-TOP-TITLE
+    MOVE W-RUN-YYSW TO W-YMD-YYSW
+    MOVE W-RUN-YYDEF TO W-YMD-YYDEF
+    MOVE W-RUN-YYCOM TO W-YMD-YYCOM
+    ACCEPT W-YMD-DATE FROM ENVIRONMENT CENTURY-DATE
+    MOVE W-YMD-YY TO W-YMD-YYB
+    MOVE W-YMD-YY TO W-YMD-YY1
+    MOVE W-YMD-MM TO W-YMD-MM1
+    MOVE W-YMD-DD TO W-YMD-DD1
+    IF W-YMD-YYCOM NOT = "+" AND "-"
+        ACCEPT W-YMD-YYSW       FROM ENVIRONMENT "ZS_SYYW"
+                 END-ACCEPT
+        ACCEPT W-YMD-YDFSW      FROM ENVIRONMENT "ZS_SYDF"
+                 END-ACCEPT
+        ACCEPT W-YMD-YYCOM      FROM ENVIRONMENT "ZS_SYCM"
+                 END-ACCEPT
+        IF W-YMD-YYSW NOT = "2" AND "4" THEN
+                         MOVE "0" TO W-YMD-YYSW
+                 END-IF
+        IF W-YMD-YYCOM NOT = "+" AND "-" THEN
+                         MOVE "-" TO W-YMD-YYCOM
+                 END-IF
+        MOVE W-YMD-YDFSW TO W-YMD-YYDEF
+        IF ( W-YMD-YYDEF = 0 ) AND
+                    ( W-YMD-YYSW  = "0" ) AND
+                    ( W-YMD-YYCOM = "-" ) THEN
+                         MOVE 1911 TO W-YMD-YYDEF
+                 END-IF
+    END-IF
+    MOVE SPACE TO W-YMD-YYS
+    IF W-YMD-YYSW = "4"
+        CONTINUE
+    ELSE
+        IF W-YMD-YYSW = "2" THEN
+                 MOVE W-YMD-YY1 TO W-YMD-YY
+         ELSE    IF W-YMD-YYCOM = "+" THEN
+                         COMPUTE W-YMD-YY = W-YMD-YY + W-YMD-YYDEF
+                 ELSE    IF W-YMD-YY > W-YMD-YYDEF THEN
+                                 COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF
+                         ELSE    COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF - 1
+                                 MOVE "-" TO W-YMD-YYS
+                         END-IF
+                 END-IF
+         END-IF
+    END-IF
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+
+PARAGRAPH: F-RCB1-Aft-Create
+    PERFORM F-CREATE-HRSTATUS-RTN
+
+PARAGRAPH: F-RCB1-Aft-Initdata
+    MODIFY S-IPD-MARK, ENABLED = 0
+    PERFORM F-INIT-RTN THRU F-INIT-EXIT
+    EVALUATE W-SOU
+        WHEN "M"
+            PERFORM F-IPDIF-RTN
+        WHEN "S"
+            PERFORM F-MOVE-INQ-TITLE
+            PERFORM F-RCB-RTN
+        WHEN "O"
+            PERFORM F-IPDNO-RTN THRU F-IPDNO-END
+            PERFORM F-MOVE-INQ-TITLE
+            PERFORM F-RCB-RTN
+    END-EVALUATE
+    MOVE IPD-BED TO W-TMP-IBGCF-IPD-BED
+    PERFORM F-BLANK
+    INITIALIZE L-HTICB2BF-LNK
+    MOVE "0" TO L-HTICB2BF-STATUS
+    CALL HTICB2BF USING L-HTICB2BF-LNK
+
+PARAGRAPH: F-RCB1-Ex-Other
+    PERFORM F-BLANK
+    EVALUATE KEY-STATUS
+        WHEN 27
+        WHEN W-EXIT
+            IF W-TMP-PACK-YN = "Y" THEN
+                                 IF L-PAM-LOG-YN = "Y" THEN
+                                         INITIALIZE W-TMP-HZPAM
+                                         PERFORM F-PACK-RTN
+                                 END-IF
+                         END-IF
+            EVALUATE W-SOU
+        WHEN W-SEARCH
+            PERFORM F-SEARCH-IPLIF-RTN
+        WHEN W-DEL
+            PERFORM F-DEL-RTN
+        WHEN W-PRINT
+            MODIFY S-RCB1-GD-1, Y = W-GRID-Y
+            INQUIRE S-RCB1-GD-1, RECORD-DATA = W-GD-REC
+            IF W-GD-REC NOT = SPACE THEN
+                                 PERFORM F-F5-PRINT-RTN
+                         END-IF
+        WHEN W-DELETE
+            IF W-RUN-SID = "G" OR "H" THEN
+                                 INITIALIZE W-NOTE
+                                 MOVE "歷史區只可使用查詢功能！！"       TO W-NOTE
+                                 PERFORM F-ERR-NOTE
+                         ELSE
+                                 MODIFY S-RCB1-GD-1, Y = W-GRID-Y
+                                 INQUIRE S-RCB1-GD-1, RECORD-DATA = W-GD-REC
+                                 IF W-GD-REC NOT = SPACE THEN
+                                         PERFORM F-DELETE-RTN
+
+                                 END-IF
+                         END-IF
+        WHEN W-REPORT
+            MODIFY S-RCB1-GD-1, Y = W-GRID-Y
+            INQUIRE S-RCB1-GD-1, RECORD-DATA = W-GD-REC
+            PERFORM F-REPORT-RTN
+        WHEN W-DATA
+            MODIFY S-RCB1-GD-1, Y = W-GRID-Y
+            INQUIRE S-RCB1-GD-1, RECORD-DATA = W-GD-REC
+            IF W-INQ-RX-WAY NOT = SPACE THEN
+                                 PERFORM Acu-S-HT-DATA-Routine
+                         END-IF
+        WHEN W-RCB1
+            INITIALIZE W-TMP-PARA
+            MOVE "A"        TO W-TMP-PARA
+            PERFORM F-RCB-RTN
+        WHEN W-RCB2
+            INITIALIZE W-TMP-PARA
+            MOVE "B"        TO W-TMP-PARA
+            PERFORM F-RCB-RTN
+        WHEN W-RCB3
+            INITIALIZE W-TMP-PARA
+            MOVE "C"        TO W-TMP-PARA
+            PERFORM F-RCB-RTN
+    END-EVALUATE
+
+PARAGRAPH: F-RCB-RTN
+    PERFORM F-TOP-TITLE
+    DISPLAY DISPLAY S-RCB1.
+    PERFORM F-FORM-TITLE
+    PERFORM F-FUN-RTN THRU F-FUN-EXIT
+    IF W-CHK-EXIT = "Y"
+        EVALUATE W-SOU
+    END-IF
+
+PARAGRAPH: F-STOP-RTN
+    IF W-HRDTA-COUNT > 0
+        PERFORM F-HRIBGCF-MOVE-QQ
+    END-IF
+    INITIALIZE L-HTICB2BF-LNK
+    MOVE "2" TO L-HTICB2BF-STATUS
+    CALL HTICB2BF USING L-HTICB2BF-LNK
+    PERFORM F-HT-CLOSE
+    EVALUATE W-SOU
+        WHEN "M"
+            PERFORM F-CLOSE-RTN THRU F-CLOSE-EXIT
+        WHEN "O"
+            PERFORM F-CLOSE-RTN THRU F-CLOSE-EXIT
+    END-EVALUATE
+    DESTROY 細明體12, 細明體11, Fixed-Font
+    DESTROY S-RCB1-Mn-1-Handle
+    GOBACK
+
+PARAGRAPH: F-HRIBGCF-MOVE-QQ
+    INITIALIZE W-IBGCF-LNK
+    MOVE W-DATE TO W-IBGCF-DATE
+    MOVE "A" TO W-IBGCF-GET-UNIT
+    MOVE W-TMP-IBGCF-IPD-BED TO W-IBGCF-IPD-BED
+    MOVE "q" TO W-IBGCF-PAPER-ID
+    MOVE HRDTA-IPD-NO TO W-IBGCF-PRINT-DATA(1:11)
+    MOVE HRDTA-ODR-NO TO W-IBGCF-PRINT-DATA(12:13)
+    CALL HRIBGCF USING W-IBGCF-LNK
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Begin-Entry
+    SET EVENT-ACTION TO EVENT-ACTION-FAIL
+    PERFORM F-RCB1-GD-1-EV-MSG-GOTO-CELL
+    IF W-TMP-ECB-TYPE = "2"
+        MODIFY S-RCB1-GD-1, Y = W-GRID-Y
+        INQUIRE S-RCB1-GD-1, RECORD-DATA = W-GD-REC
+        PERFORM F-REPORT-RTN
+    END-IF
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Begin-Drag
+    SET EVENT-ACTION TO EVENT-ACTION-FAIL
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Goto-Cell
+    IF (EVENT-DATA-2 = 16 AND W-GRID-Y = 2) OR (EVENT-DATA-2 = 2 AND W-GRID-Y = 16)
+        SET EVENT-ACTION TO EVENT-ACTION-FAIL
+    ELSE
+        MOVE EVENT-DATA-2       TO W-GRID-Y
+    END-IF
+    PERFORM F-COLOR-RTN
+
+PARAGRAPH: F-COLOR-RTN
+    MODIFY S-RCB1-GD-1, CURSOR-Y = W-GRID-Y, Y = W-GRID-Y
+    MODIFY S-RCB1-GD-1,START-X = 1,X = 99,START-Y = W-GRID-Y ,Y = W-GRID-Y,REGION-COLOR = W-GD-COLOR
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Goto-Cell-Mouse
+    MOVE EVENT-DATA-2 TO W-GRID-Y
+    PERFORM F-COLOR-RTN
+
+PARAGRAPH: F-TOP-TITLE
+    EVALUATE W-TMP-PARA
+        WHEN "A"
+            MOVE "住院期間用藥明細查詢"     TO W-TOP-TITLE(1:50)
+        WHEN "B"
+            MOVE "住院期間檢驗放射線查詢"   TO W-TOP-TITLE(1:50)
+        WHEN "C"
+            MOVE "住院期間治療處置查詢"     TO W-TOP-TITLE(1:50)
+    END-EVALUATE
+
+PARAGRAPH: F-IPDIF-RTN
+    INITIALIZE L-IPDIF-LNK
+    CALL HRIPDIF USING L-IPDIF-LNK
+    IF L-LNK-YN NOT = "Y"
+        PERFORM F-EXIT-RTN
+    ELSE
+        PERFORM F-MOVE-INQ-TITLE
+        PERFORM F-RCB-RTN
+    END-IF
+
+PARAGRAPH: F-IPDNO-RTN
+    INITIALIZE PAT-MST-REC, IPD-MST-REC
+    MOVE W-HTCGUICF-EXT-PT-NO TO PAT-NO, IPD-PAT-NO
+    READ PAT-MST KEY IS PAT-MST-KEY
+    INITIALIZE W-PTDECF-LNK
+    MOVE 'O' TO W-PTDECF-IO-SW
+    MOVE 'Y' TO W-PTDECF-IO-HHPAT-YN
+    MOVE PAT-NO TO W-PTDECF-PAT-NO
+    MOVE 'HRRCB1IF' TO W-PTDECF-PROG-ID
+    MOVE 'F-IPDNO' TO W-PTDECF-PROG-PARA
+    MOVE '住院期間用藥明細查詢' TO W-PTDECF-PROG-NM
+    MOVE W-RUN-USID TO W-PTDECF-UPD-UID
+    MOVE PAT-MST-REC TO W-PTDECF-PAT-MST-REC
+    CALL HHPTDECF USING W-PTDECF-LNK
+    EVALUATE W-PTDECF-IO-YN
+        WHEN 'Y'
+            MOVE W-PTDECF-PAT-MST-REC TO PAT-MST-REC
+        WHEN 'N'
+            DISPLAY MESSAGE "病歷號: " PAT-NO "病歷檔加解密失敗!!"
+         END-EVALUATE.
+    END-EVALUATE
+    IF PAT-MST-STATUS NOT = "00"
+        DISPLAY MESSAGE "無此病歷號碼，請檢查！"
+         ELSE
+                 INITIALIZE IPX-MST-REC
+                 MOVE "A"        TO IPX-LIVE-ID
+                 MOVE PAT-NO     TO IPX-PAT-NO
+                 START IPX-MST KEY IS >= IPX-ALT-KEY3
+                 READ IPX-MST NEXT RECORD
+                 IF IPX-MST-STATUS NOT = "00" OR IPX-LIVE-ID NOT = "A" OR
+                    IPX-PAT-NO NOT = PAT-NO THEN
+                         DISPLAY MESSAGE "查無符合之住院延伸資料，請檢查！"
+                 ELSE
+                         INITIALIZE IPD-MST-REC
+                         MOVE IPX-NO     TO IPD-NO
+                         READ IPD-MST KEY IS IPD-MST-KEY
+ *> 
+                         IF IPD-MST-STATUS NOT = "00" OR
+                            IPD-PAT-NO NOT = W-HTCGUICF-EXT-PT-NO THEN
+                                 DISPLAY MESSAGE "查無符合之住院延伸資料，請檢查！"
+                         ELSE
+                                 IF (IPD-OUT-DT NOT = 0 AND IPD-OUT-DT < W-DATE) THEN
+                                         DISPLAY MESSAGE "請注意！此病患已辦理出院！！"
+                                 END-IF
+                         END-IF
+                 END-IF
+         END-IF.
+    ELSE
+        INITIALIZE IPX-MST-REC
+        MOVE "A"        TO IPX-LIVE-ID
+        MOVE PAT-NO     TO IPX-PAT-NO
+        START IPX-MST KEY IS >= IPX-ALT-KEY3
+        READ IPX-MST NEXT RECORD
+        IF IPX-MST-STATUS NOT = "00" OR IPX-LIVE-ID NOT = "A" OR
+                    IPX-PAT-NO NOT = PAT-NO THEN
+                         DISPLAY MESSAGE "查無符合之住院延伸資料，請檢查！"
+                 ELSE
+                         INITIALIZE IPD-MST-REC
+                         MOVE IPX-NO     TO IPD-NO
+                         READ IPD-MST KEY IS IPD-MST-KEY
+ *> 
+                         IF IPD-MST-STATUS NOT = "00" OR
+                            IPD-PAT-NO NOT = W-HTCGUICF-EXT-PT-NO THEN
+                                 DISPLAY MESSAGE "查無符合之住院延伸資料，請檢查！"
+                         ELSE
+                                 IF (IPD-OUT-DT NOT = 0 AND IPD-OUT-DT < W-DATE) THEN
+                                         DISPLAY MESSAGE "請注意！此病患已辦理出院！！"
+                                 END-IF
+                         END-IF
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-IPDNO-END
+    EXIT
+
+PARAGRAPH: F-HTICB2BF-NOTE-RTN
+    INITIALIZE W-HRMESCF-DATA, W-HRMESCF-DATA2
+    MOVE "檢驗放射線連線處理失敗！！" TO W-HRMESCF-NOTE(1)
+    MOVE "請注意：本次檢驗處方並無連線至檢驗系統！" TO W-HRMESCF-NOTE(3)
+    MOVE "　　　　如有刪除檢驗處方，則請盡速連絡資訊室人員" TO W-HRMESCF-NOTE(5)
+    MOVE "2" TO W-HRMESCF-PIC-TYPE
+    MOVE "3" TO W-HRMESCF-BUT-TYPE
+    CALL HRMESCF USING W-HRMESCF-DATA, W-HRMESCF-DATA2
+
+PARAGRAPH: F-HTICB2BF-NOTE-END
+    EXIT
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Paged-Prev
+    PERFORM F-BLANK
+    IF W-GRID-Y = 2
+        PERFORM F-SCREEN-UP
+    ELSE
+        SUBTRACT 1 FROM W-GRID-Y
+        MOVE W-GRID-Y TO W-GRID-Y1
+        MODIFY S-RCB1-GD-1,START-X = 1,X = 99,START-Y = W-GRID-Y ,Y = W-GRID-Y,REGION-COLOR = W-GD-COLOR
+    END-IF
+    SET EVENT-ACTION  TO Event-Action-Complete
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Paged-Next
+    PERFORM F-BLANK
+    IF W-GRID-Y = W-MENU-ITEMS
+        PERFORM F-Screen-DOWN
+    ELSE
+        ADD 1 TO W-GRID-Y
+        MOVE W-GRID-Y TO W-GRID-Y1
+        MODIFY S-RCB1-GD-1,START-X = 1,X = 99,START-Y = W-GRID-Y ,Y = W-GRID-Y,REGION-COLOR = W-GD-COLOR
+    END-IF
+    SET EVENT-ACTION  TO Event-Action-Complete
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Paged-Nextpage
+    PERFORM F-BLANK
+    PERFORM F-SCREEN-DOWN
+    SET EVENT-ACTION TO EVENT-ACTION-FAIL
+
+PARAGRAPH: F-RCB1-Gd-1-Ev-Msg-Paged-Prevpage
+    PERFORM F-BLANK
+    PERFORM F-SCREEN-UP
+    SET EVENT-ACTION TO EVENT-ACTION-FAIL
+
+PARAGRAPH: F-HT-DATA-Ex-Cmd-Close
+    PERFORM Acu-S-HT-DATA-Exit
+
+PARAGRAPH: F-HT-DATA-Aft-Initdata
+    PERFORM F-HT-DATA-RTN
+
+PARAGRAPH: S-HT-DATA-Ex-Other
+    PERFORM F-HT-DATA-EX-CMD-CLOSE
+
+PARAGRAPH: F-CHK-FORM-RTN
+    EVALUATE W-TMP-PARA
+        WHEN "A"
+            MODIFY S-RCB1-Gd-1, COLUMN-DIVIDERS = (1,1,1,1,1,1,1,1,1)
+            PERFORM F-SHOW-FORM1-RTN
+            MOVE "1"        TO W-TMP-ECB-TYPE
+        WHEN "B"
+            MODIFY S-RCB1-Gd-1, COLUMN-DIVIDERS = (1,1,0,1,0,1,1,1,1)
+            PERFORM F-SHOW-FORM2-RTN
+            MOVE "2"        TO W-TMP-ECB-TYPE
+        WHEN "C"
+            MODIFY S-RCB1-Gd-1, COLUMN-DIVIDERS = (1,0,0,1,1,1,1,1,1)
+            PERFORM F-SHOW-FORM3-RTN
+            MOVE "3"        TO W-TMP-ECB-TYPE
+    END-EVALUATE
+
+PARAGRAPH: F-SHOW-FORM1-RTN
+    MODIFY S-RCB1-GD-1, START-X = 1, X = 99, START-Y = 2, Y = 2, REGION-COLOR = 1
+    MODIFY S-RCB1-GD-1, RESET-GRID = 1, NUM-ROWS = 16
+    PERFORM ACU-S-RCB1-GD-1-CONTENT
+    MODIFY S-RCB1-GD-1, X = 3, Y = 1, CELL-DATA = "次劑量"
+    MODIFY S-RCB1-GD-1, X = 4, Y = 1, CELL-DATA = "服法"
+    MODIFY S-RCB1-GD-1, X = 5, Y = 1, CELL-DATA = "天"
+    MODIFY S-RCB1-GD-1, X = 8, Y = 1, CELL-DATA = "類別"
+    MODIFY S-RCB1-GD-1, X = 9, Y = 1, CELL-DATA = "退"
+    MODIFY S-RCB1-GD-1, X = 11, Y = 1, CELL-DATA = "實際退藥量"
+    MODIFY S-RCB1-GD-1, VIRTUAL-WIDTH = 134
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-PRINT
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-DELETE
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-REPORT
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-DATA
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-RCB1
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-RCB2
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-RCB3
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-DEL
+
+PARAGRAPH: F-SHOW-FORM2-RTN
+    MODIFY S-RCB1-GD-1, START-X = 1, X = 99, START-Y = 2, Y = 2, REGION-COLOR = 1
+    MODIFY S-RCB1-GD-1, RESET-GRID = 1, NUM-ROWS = 16
+    PERFORM ACU-S-RCB1-GD-1-CONTENT
+    MODIFY S-RCB1-GD-1, X = 4, Y = 1, CELL-DATA = "狀況"
+    MODIFY S-RCB1-GD-1, X = 8, Y = 1, CELL-DATA = "異常"
+    MODIFY S-RCB1-GD-1, X = 9, Y = 1, CELL-DATA = "刪"
+    IF W-RUN-CFNO-S = "1205"
+        MODIFY S-RCB1-GD-1, X = 12, Y = 1, CELL-DATA = "取消日-時間"
+        MODIFY S-RCB1-GD-1, VIRTUAL-WIDTH = 147
+    END-IF
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-PRINT
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-DELETE
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-REPORT
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-DATA
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-RCB1
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-RCB3
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-RCB2
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-DEL
+
+PARAGRAPH: F-SHOW-FORM3-RTN
+    MODIFY S-RCB1-GD-1, START-X = 1, X = 99, START-Y = 2, Y = 2, REGION-COLOR = 1
+    MODIFY S-RCB1-GD-1, RESET-GRID = 1, NUM-ROWS = 16
+    PERFORM ACU-S-RCB1-GD-1-CONTENT
+    MODIFY S-RCB1-GD-1, X = 5, Y = 1, CELL-DATA = "天"
+    MODIFY S-RCB1-GD-1, X = 8, Y = 1, CELL-DATA = "類別"
+    MODIFY S-RCB1-GD-1, X = 9, Y = 1, CELL-DATA = "退"
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-PRINT
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-DELETE
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-REPORT
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-DATA
+    CALL W$MENU USING WMENU-DISABLE, S-RCB1-Mn-1-Handle, W-RCB3
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-RCB1
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-RCB2
+    CALL W$MENU USING WMENU-ENABLE, S-RCB1-Mn-1-Handle, W-DEL
+
+PARAGRAPH: F-FUN-RTN
+    PERFORM F-CHK-FORM-RTN
+    INITIALIZE W-CHK-EXIT
+    EVALUATE W-TMP-PARA
+        WHEN "A"
+            PERFORM F-CHK-ECB1-RTN
+            IF W-FS = 10 THEN
+                                 PERFORM F-MESG1-RTN
+                                 PERFORM F-IPLIF-RTN
+                                 IF W-LNK-IPL-YN = "Y" THEN
+                                         PERFORM F-MOVE-INQ-TITLE
+                                         GO TO F-FUN-RTN
+                                 ELSE
+                                         MOVE "Y"        TO W-CHK-EXIT
+                                         GO TO F-FUN-EXIT
+                                 END-IF
+                         ELSE
+                                 PERFORM F-PICB-RTN
+                         END-IF
+        WHEN "B"
+            PERFORM F-CHK-ECB2-RTN
+            IF W-RUN-CFNO-S = "1205" THEN
+                                 INITIALIZE HRDTB-MST-REC
+                                 MOVE IPD-NO     TO HRDTB-IPD-NO
+                                 PERFORM F-START-HRDTB-RTN THRU F-START-HRDTB-EXIT
+                         END-IF
+            IF W-FS = 10     THEN
+                                 PERFORM F-MESG2-RTN
+                                 PERFORM F-IPLIF-RTN
+                                 IF W-LNK-IPL-YN = "Y" THEN
+                                         PERFORM F-MOVE-INQ-TITLE
+                                         GO TO F-FUN-RTN
+                                 ELSE
+                                         MOVE "Y"        TO W-CHK-EXIT
+                                         GO TO F-FUN-EXIT
+                                 END-IF
+                         ELSE
+*> START                         (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+*>                               PERFORM F-PICB-RTN
+                                 IF W-RUN-CFNO-S = "1205" THEN
+                                         MOVE 1          TO W-PAGE W-NO
+                                         MOVE ECB-MST-REC        TO W-PICB W-KEY1(W-PAGE)
+                                         MOVE HRDTB-MST-REC      TO W-KEY2(W-PAGE)
+                                         PERFORM F-READ-TEST-RTN THRU F-READ-TEST-EXIT
+                                 ELSE
+                                         PERFORM F-PICB-RTN
+                                 END-IF
+*> END 106.11.09
+                         END-IF
+        WHEN "C"
+            PERFORM F-CHK-ECB1-RTN
+            IF W-FS = 10 THEN
+                                 PERFORM F-MESG3-RTN
+                                 PERFORM F-IPLIF-RTN
+                                 IF W-LNK-IPL-YN = "Y" THEN
+                                         PERFORM F-MOVE-INQ-TITLE
+                                         GO TO F-FUN-RTN
+                                 ELSE
+                                         MOVE "Y"        TO W-CHK-EXIT
+                                         GO TO F-FUN-EXIT
+
+                                 END-IF
+                         ELSE
+                                 PERFORM F-PICB-RTN
+                         END-IF
+    END-EVALUATE
+
+PARAGRAPH: F-FUN-EXIT
+    EXIT
+
+PARAGRAPH: F-MESG1-RTN
+    INITIALIZE W-NOTE
+    IF W-TYPE1 = "D"
+        MOVE "患者此次住院期間並無刪除整張處方！"       TO W-NOTE
+        PERFORM F-ERR-NOTE
+        INITIALIZE W-TYPE1
+    ELSE
+        MOVE "患者此次住院期間並無開立藥品！"   TO W-NOTE
+        PERFORM F-ERR-NOTE
+    END-IF
+
+PARAGRAPH: F-MESG2-RTN
+    INITIALIZE W-NOTE
+    MOVE "患者此次住院期間並無開立檢驗放射線！" TO W-NOTE
+    PERFORM F-ERR-NOTE
+
+PARAGRAPH: F-MESG3-RTN
+    INITIALIZE W-NOTE
+    IF W-TYPE1 = "D"
+        MOVE "患者此次住院期間並無刪除整張處方！" TO W-NOTE
+        PERFORM F-ERR-NOTE
+        INITIALIZE W-TYPE1
+    ELSE
+        MOVE "患者此次住院期間並無確認治療處置！" TO W-NOTE
+        PERFORM F-ERR-NOTE
+    END-IF
+
+PARAGRAPH: F-IPLIF-RTN
+    INITIALIZE ECB-MST-REC, W-PICB
+    INITIALIZE W-IPLIF-LNK
+    MOVE PAT-NO TO W-LNK-PAT-NO
+    CALL HRIPLIF USING W-IPLIF-LNK
+
+PARAGRAPH: F-PICB-RTN
+    MOVE 1 TO W-PAGE, W-NO
+    MOVE ECB-MST-REC TO W-PICB, W-KEY1(W-PAGE)
+    PERFORM F-999-RTN
+    IF L-PAM-LOG-YN     = "Y"
+        PERFORM F-CATCH-SEL-RTN
+    END-IF
+
+PARAGRAPH: F-CHK-ECB1-RTN
+    INITIALIZE ECB-MST-REC
+    IF W-TYPE1 = "D"
+        MOVE "D"        TO ECB-DEL-MARK
+    END-IF
+    MOVE IPD-NO TO ECB-IPD-NO
+    MOVE W-TMP-ECB-TYPE TO ECB-TYPE
+    PERFORM F-STARTS-RTN
+    PERFORM F-READN-RTN THRU F-READN-EXIT
+
+PARAGRAPH: F-CHK-ECB2-RTN
+    INITIALIZE ECB-MST-REC
+    MOVE IPD-NO TO ECB-IPD-NO
+    MOVE W-TMP-ECB-TYPE TO ECB-TYPE
+    PERFORM F-STARTS-RTN
+    PERFORM F-READN-RTN THRU F-READN-EXIT
+
+PARAGRAPH: F-STARTS-RTN
+    START START ECB-MST KEY IS NOT < ECB-ALT-KEY2
+    MOVE ECB-MST-STATUS TO W-FS
+
+PARAGRAPH: F-STARTG-RTN
+    START START ECB-MST KEY IS > ECB-ALT-KEY2
+    MOVE ECB-MST-STATUS TO W-FS
+
+PARAGRAPH: F-READN-RTN
+    READ ECB-MST NEXT
+    MOVE ECB-MST-STATUS TO W-FS
+    IF ECB-MST-STATUS = "00"
+        INITIALIZE ICB-MST-REC
+        MOVE ECB-KEY   TO ICB-KEY
+        READ ICB-MST KEY IS ICB-KEY
+        IF ICB-MST-STATUS NOT = "00" THEN
+                         GO TO F-READN-RTN
+                 END-IF
+    END-IF
+    IF ECB-MST-STATUS NOT = "00" OR ECB-IPD-NO NOT = IPD-NO
+            OR ECB-TYPE NOT = W-TMP-ECB-TYPE
+        MOVE 10 TO W-FS
+    END-IF
+
+PARAGRAPH: F-READN-EXIT
+    EXIT
+
+PARAGRAPH: F-999-RTN
+    PERFORM F-CHK-FORM-RTN
+    INITIALIZE W-DIS-TABLE
+    PERFORM VARYING
+        PERFORM F-LOAD-GRID-RTN
+        PERFORM F-READN-RTN
+    END-PERFORM
+    MODIFY S-RCB1-GD-1,START-X = 1,X = 99,START-Y = 2 ,Y = 2,REGION-COLOR = W-GD-COLOR
+    MOVE 2 TO W-GRID-Y, W-GRID-Y1
+
+PARAGRAPH: F-LOAD-GRID-RTN
+    INITIALIZE W-GD-REC
+    MOVE ECB-MST-REC TO W-DIS-REC(W-II)
+    MOVE W-NO TO W-INQ-SEQ
+    IF ICB-UNIT NOT = SPACE
+        MOVE ICB-UNIT           TO W-QTY1
+        MOVE ICB-RX-UNIT        TO W-QTY2
+        PERFORM F-QTY-RTN
+        MOVE W-DIS-QTY          TO W-INQ-RX-UQTY
+    ELSE
+        IF ICB-RX-UQTY1 > 0 AND ICB-RX-UQTY2 > 0 THEN
+*> 2022/08/22 增加WITH CONVERT
+                         MOVE ICB-RX-UQTY(1:2)   TO W-QTY1 
+                         MOVE ICB-RX-UQTY(3:2)   TO W-QTY2 
+                         PERFORM F-QTY-RTN
+                         MOVE W-DIS-QTY          TO W-INQ-RX-UQTY
+                 ELSE
+                         MOVE SPACE              TO W-INQ-RX-UQTY
+                 END-IF
+    END-IF
+    IF ICB-RX-QTY1 > 0 AND ICB-RX-QTY2 > 0
+        MOVE ICB-RX-QTY(1:4)    TO W-QTY1
+        MOVE ICB-RX-QTY(5:2)    TO W-QTY2
+        PERFORM F-QTY-RTN
+        MOVE W-DIS-QTY          TO W-INQ-RX-QTY
+    ELSE
+        MOVE ICB-RX-QTY1        TO W-INQ-RX-QTY(1:4)
+        MOVE ICB-RX-QTY2        TO W-INQ-RX-QTY(6:2)
+    END-IF
+    IF ECB-ODR-NO NOT = ICA-ODR-NO
+        INITIALIZE ICA-MST-REC
+        MOVE ECB-ODR-NO         TO ICA-ODR-NO
+        MOVE IPD-NO             TO ICA-IPD-NO
+        READ ICA-MST KEY IS ICA-KEY
+    END-IF
+    EVALUATE W-TMP-ECB-TYPE
+        WHEN "1"
+        WHEN "3"
+            EVALUATE ICA-UD-MARK
+        WHEN OTHER
+            INITIALIZE W-INQ-TYPE
+    END-EVALUATE
+    MOVE ICB-RX-WAY1 TO W-INQ-RX-WAY(1:5)
+    MOVE ICB-RX-WAY2 TO W-INQ-RX-WAY(6:5)
+    MOVE ICB-RX-DAYS TO W-INQ-RX-DAYS
+    MOVE ICA-INS-DATE TO W-INQ-INS-DATE(1:7)
+    MOVE "-" TO W-INQ-INS-DATE(8:1)
+    IF ICA-ODR-TIME IS NUMERIC
+        MOVE ICA-ODR-TIME       TO W-INQ-INS-DATE(9:4)
+    END-IF
+    INITIALIZE PRS-MST-REC
+    MOVE ICB-FEE-KEY TO PRS-MST-ID
+    READ PRS-MST KEY IS PRS-MST-KEY
+    IF PRS-MST-STATUS = "00"
+        MOVE PRS-ID-NAME        TO W-INQ-PRS-NAME
+    ELSE
+        MOVE "代碼已不存在"     TO W-INQ-PRS-NAME
+    END-IF
+    INITIALIZE RTB-MST-REC, W-RTB-QTY
+    MOVE IPD-NO TO RTB-IPD-NO
+    INITIALIZE A4GL-WHERE-CONSTRAINT
+    STRING STRING " rtb_key like '" IPD-NO "%'"
+                 " and substring(rtb_group_data1,145,11) = '" ICB-ODR-NO "'"
+                 " and substring(rtb_group_data1,156,3) = '" ICB-FEE-SEQ "'"
+                 DELIMITED BY SIZE INTO A4GL-WHERE-CONSTRAINT
+    INSPECT INSPECT A4GL-WHERE-CONSTRAINT REPLACING TRAILING SPACES
+                 BY LOW-VALUES
+    START START RTB-MST KEY IS > RTB-KEY
+    INITIALIZE A4GL-WHERE-CONSTRAINT
+    READ RTB-MST NEXT
+    PERFORM UNTIL RTB-MST-STATUSNOT="00"ORRTB-IPD-NONOT=IPD-NO
+        INITIALIZE RTA-MST-REC
+        MOVE RTB-IPD-NO TO RTA-IPD-NO
+        MOVE RTB-ODR-NO TO RTA-ODR-NO
+        READ RTA-MST KEY IS RTA-KEY
+        IF RTA-MST-STATUS = "00" AND RTA-DEL-MARK = "D" THEN
+                         READ RTB-MST NEXT RECORD
+                         EXIT PERFORM CYCLE
+                 END-IF
+        PERFORM F-ADD-RTB-QTY
+        READ RTB-MST NEXT RECORD
+    END-PERFORM
+    IF W-RTB-QTY1 > 0 AND W-RTB-QTY2 > 0
+        MOVE "*"                TO W-INQ-MARK
+        MOVE W-RTB-QTY1         TO W-QTY1
+        MOVE W-RTB-QTY2         TO W-QTY2
+        PERFORM F-QTY-RTN
+        MOVE W-DIS-QTY          TO W-INQ-RTB-RX-QTY
+    ELSE
+        MOVE SPACE      TO W-INQ-MARK
+        INITIALIZE W-INQ-RTB-RX-QTY
+    END-IF
+    IF W-TMP-PARA = "B"
+        PERFORM F-GET-STATUS
+        IF W-NID-6101(80:1) = "Y" AND W-DIS-ITM-NM(W-II) NOT = SPACE THEN
+                         MOVE W-DIS-ITM-NM(W-II) TO W-INQ-PRS-NAME
+                 END-IF
+        MOVE SPACE      TO W-INQ-RX-UQTY W-INQ-RX-DAYS
+    END-IF
+    IF W-TMP-PARA = "C"
+        MOVE SPACE      TO W-INQ-RX-UQTY W-INQ-RX-WAY W-INQ-RX-DAYS
+    END-IF
+    INITIALIZE W-INQ-ICB-OP-B
+    MOVE ICB-OP-BDATE TO W-TMP-ICB-OP-BDATE
+    MOVE ICB-OP-EDATE TO W-TMP-ICB-OP-EDATE
+    IF ICB-OP-BD-YY > 0 OR ICB-OP-ED-YY > 0
+        STRING W-TMP-ICB-OP-BDATE "-" ICB-OP-BTIME "~"
+                         W-TMP-ICB-OP-EDATE "-" ICB-OP-ETIME
+                         DELIMITED BY SIZE INTO W-INQ-ICB-OP-B
+                 END-STRING
+    END-IF
+    MODIFY S-RCB1-Gd-1, X = 1 , Y = W-II, RECORD-TO-ADD = W-GD-REC
+    MOVE W-GD-REC TO W-DISR(W-II)
+    ADD 1           TO W-NO
+
+PARAGRAPH: F-GET-STATUS
+    INITIALIZE HTCHK-REC
+    MOVE ICB-CHK-NO TO HTCHK-CHK-NO
+    IF ICA-UD-MARK = "O"
+        INITIALIZE FON-MST-REC
+        MOVE "06"       TO FON-ID
+        MOVE IPD-NO     TO FON-06-IPD-NO
+        START FON-MST KEY IS NOT < FON-MST-KEY
+        READ FON-MST NEXT RECORD
+        PERFORM F-GET-STATUS1 UNTIL FON-MST-STATUS NOT = "00" OR
+                         FON-ID NOT = "06" OR FON-06-IPD-NO NOT = IPD-NO OR
+                         HTCHK-IP-DATE > 0
+    ELSE
+        MOVE ICB-INS-DATE       TO HTCHK-IP-DATE
+    END-IF
+    MOVE HTCHK-IP-DATE TO W-HTCHK-IP-DATE(W-II)
+    READ HTCHK-MST KEY IS HTCHK-KEY
+    IF HTCHK-MST-STATUS = "00"
+        INITIALIZE W-ODRW-TABLE W-ODRW-AC-TABLE W-HR-ODRW-WK-NAME
+        MOVE ICB-IPD-NO TO W-ODRW-IP-NO(1:11)
+        MOVE ICB-ODR-NO TO W-ODRW-IP-NO(12:11)
+        MOVE ICB-FEE-SEQ        TO W-ODRW-PRS-SEQ
+        MOVE ICB-CHK-NO TO W-ODRW-CHK-NO
+        MOVE ICB-ITM-CD TO W-ODRW-ITM-CD
+        CALL "HTODRWCF" USING W-ODRW-TABLE, W-ODRW-AC-TABLE, W-HR-ODRW-WK-NAME
+                         ON EXCEPTION PERFORM F-MOVE-WK-NAME-RTN THRU F-MOVE-WK-NAME-EXIT
+                 END-CALL
+        MOVE W-HR-ODRW-WK-NAME TO W-INQ-RX-WAY(1:8)
+        IF W-HR-ODRW-WK-NAME(1:4) = "異常" OR "危險" THEN
+                                MOVE "⊕"       TO W-INQ-TYPE
+                 END-IF
+        PERFORM F-MOVE-CHK-DATA
+    ELSE
+        IF ICB-CHK-NO = SPACE OR "   00000" THEN
+                         INITIALIZE W-INQ-RX-UQTY
+                 ELSE
+                         MOVE "不存在"   TO W-INQ-RX-UQTY
+                 END-IF
+    END-IF
+    MOVE ICB-CHK-NO(2:2) TO W-DIS-CLS-CD(W-II)
+    MOVE ICB-CHK-NO(1:1) TO W-DIS-DPT-NO(W-II)
+    MOVE ICB-CHK-NO TO W-DIS-CHK-NO(W-II)
+    MOVE ICB-ITM-CD TO W-DIS-ITM-CD(W-II)
+    MOVE ECB-OPD-APY TO W-DIS-OPD-APY(W-II)
+
+PARAGRAPH: F-GET-STATUS1
+    IF FON-MST-STATUS = "00" AND FON-ID = "06" AND FON-06-IPD-NO = IPD-NO
+        IF ICB-ODR-NO = FON-06-ODR-NO THEN
+                         MOVE FON-06-RO-NO(1:7)  TO HTCHK-IP-DATE 
+                 END-IF
+        IF ICB-ODR-NO = FON-06-ODR-NO2 THEN
+                         MOVE FON-06-RO-NO(1:7)  TO HTCHK-IP-DATE 
+                 END-IF
+    END-IF
+    READ FON-MST NEXT
+
+PARAGRAPH: F-MOVE-CHK-DATA
+    MOVE HTCHK-AC-MAN TO W-DIS-AC-MAN(W-II)
+    MOVE HTCHK-AC-DATE TO W-DIS-AC-DATE(W-II)
+    MOVE HTCHK-AC-TIME TO W-DIS-AC-TIME(W-II)
+    MOVE HTCHK-RP-F-MAN TO W-DIS-RP-F-MAN(W-II)
+    MOVE HTCHK-RP-L-MAN TO W-DIS-RP-L-MAN(W-II)
+    MOVE HTCHK-RP-DATE TO W-DIS-RP-DATE(W-II)
+    MOVE HTCHK-RP-TIME TO W-DIS-RP-TIME(W-II)
+    INITIALIZE HTCTM-REC
+    MOVE HTCHK-CHK-NO TO HTCTM-CHK-NO
+    MOVE HTCHK-IP-DATE TO HTCTM-IP-DATE
+    MOVE ICB-ITM-CD TO HTCTM-ITM-CD
+    READ HTCTM-MST KEY IS HTCTM-KEY
+    IF HTCTM-MST-STATUS = "00" AND HTCTM-CHK-NO = HTCHK-CHK-NO AND
+            HTCTM-IP-DATE = HTCHK-IP-DATE AND HTCTM-ITM-CD = ICB-ITM-CD
+        INITIALIZE HTITM-REC
+        MOVE HTCTM-CLS-NO TO HTITM-CLS-NO
+        MOVE HTCTM-ITM-CD TO HTITM-ITM-CD
+        READ HTITM-MST KEY IS HTITM-KEY
+        IF HTITM-MST-STATUS = "00" AND HTITM-CLS-NO = HTCTM-CLS-NO AND
+                    HTITM-ITM-CD = HTCTM-ITM-CD THEN
+                         MOVE HTITM-ITM-NM TO W-DIS-ITM-NM(W-II)
+                 END-IF
+        INITIALIZE HTSPL-REC
+        MOVE HTCTM-DPT-CD TO HTSPL-DPT-CD
+        MOVE HTCTM-SPL-CD TO HTSPL-SPL-CD
+        READ HTSPL-MST KEY IS HTSPL-KEY
+        IF HTSPL-MST-STATUS = "00" AND HTSPL-DPT-CD = HTCTM-DPT-CD AND
+                    HTSPL-SPL-CD = HTCTM-SPL-CD THEN
+                         MOVE HTSPL-SPL-NM TO W-DIS-SPL-NM(W-II)
+
+                 END-IF
+        INITIALIZE HTBTL-REC
+        MOVE HTCTM-DPT-CD TO HTBTL-DPT-CD
+        MOVE HTCTM-BTL-CD TO HTBTL-BTL-CD
+        READ HTBTL-MST KEY IS HTBTL-KEY
+        IF HTBTL-MST-STATUS = "00" AND HTBTL-DPT-CD = HTCTM-DPT-CD AND
+                    HTBTL-BTL-CD = HTCTM-BTL-CD THEN
+                         MOVE HTBTL-BTL-NM TO W-DIS-BTL-NM(W-II)
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-MOVE-INQ-TITLE
+    MOVE PAT-NAME TO W-PAT-NAME
+    IF PAT-SEX = "1"
+        MOVE "男"       TO W-SEX
+    ELSE
+        IF PAT-SEX = "2" THEN
+                         MOVE "女"       TO W-SEX
+                 ELSE
+                         INITIALIZE W-SEX
+                 END-IF
+    END-IF
+    MOVE W-RUN-YYSW TO W-YMD-YYSW
+    MOVE W-RUN-YYDEF TO W-YMD-YYDEF
+    MOVE W-RUN-YYCOM TO W-YMD-YYCOM
+    ACCEPT W-YMD-DATE FROM ENVIRONMENT CENTURY-DATE
+    MOVE W-YMD-YY TO W-YMD-YYB
+    MOVE W-YMD-YY TO W-YMD-YY1
+    MOVE W-YMD-MM TO W-YMD-MM1
+    MOVE W-YMD-DD TO W-YMD-DD1
+    IF W-YMD-YYCOM NOT = "+" AND "-"
+        ACCEPT W-YMD-YYSW       FROM ENVIRONMENT "ZS_SYYW"
+                 END-ACCEPT
+        ACCEPT W-YMD-YDFSW      FROM ENVIRONMENT "ZS_SYDF"
+                 END-ACCEPT
+        ACCEPT W-YMD-YYCOM      FROM ENVIRONMENT "ZS_SYCM"
+                 END-ACCEPT
+        IF W-YMD-YYSW NOT = "2" AND "4" THEN
+                         MOVE "0" TO W-YMD-YYSW
+                 END-IF
+        IF W-YMD-YYCOM NOT = "+" AND "-" THEN
+                         MOVE "-" TO W-YMD-YYCOM
+
+                 END-IF
+        MOVE W-YMD-YDFSW TO W-YMD-YYDEF
+        IF ( W-YMD-YYDEF = 0 ) AND
+                    ( W-YMD-YYSW  = "0" ) AND
+                    ( W-YMD-YYCOM = "-" ) THEN
+                         MOVE 1911 TO W-YMD-YYDEF
+                 END-IF
+    END-IF
+    MOVE SPACE TO W-YMD-YYS
+    IF W-YMD-YYSW = "4"
+        CONTINUE
+    ELSE
+        IF W-YMD-YYSW = "2" THEN
+                 MOVE W-YMD-YY1 TO W-YMD-YY
+         ELSE    IF W-YMD-YYCOM = "+" THEN
+                         COMPUTE W-YMD-YY = W-YMD-YY + W-YMD-YYDEF
+                 ELSE    IF W-YMD-YY > W-YMD-YYDEF THEN
+                                 COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF
+                         ELSE    COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF - 1
+                                 MOVE "-" TO W-YMD-YYS
+                         END-IF
+                 END-IF
+         END-IF
+    END-IF
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+    IF PAT-BIRTH-DT NOT = 0
+        INITIALIZE L-DT L-AGE L-AGE-2 L-AGE-UNIT L-ID
+        MOVE W-DATE     TO L-DT
+        MOVE "Y"        TO L-ID
+        CALL "HRAGECF" USING L-DT L-AGE L-AGE-2 L-AGE-UNIT L-ID
+                 END-CALL
+        MOVE L-AGE-2    TO W-AGE
+        IF L-AGE-UNIT = "A" THEN
+                         MOVE "歲"       TO W-AGE-UNIT
+                 ELSE
+                         IF L-AGE-UNIT = "M" THEN
+                                 MOVE "月"       TO W-AGE-UNIT
+                         ELSE
+                                 MOVE "天"       TO W-AGE-UNIT
+                         END-IF
+                 END-IF
+    END-IF
+    MOVE PAT-NO TO W-PAT-NO
+    IF IPD-OUT-DT NOT = 0
+        STRING "非本次資料," IPD-OUT-DT "日出院" DELIMITED BY SIZE
+                         INTO W-IPD-MARK
+        MODIFY S-IPD-MARK, ENABLED = 1
+        MODIFY S-IPD-MARK, TITLE = W-IPD-MARK
+    ELSE
+        MODIFY S-IPD-MARK, ENABLED = 0
+        MOVE SPACE      TO W-IPD-MARK
+        MODIFY S-IPD-MARK, TITLE = W-IPD-MARK
+    END-IF
+    INITIALIZE NID-MST-REC
+    MOVE "0704" TO NID-ID
+    MOVE IPD-UNIT TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00"
+        MOVE NID-NAME   TO W-IPD-UNIT-NAME
+    ELSE
+        INITIALIZE W-IPD-UNIT-NAME
+    END-IF
+    MOVE IPD-BED-ROOM TO W-BED(1:4)
+    MOVE "-" TO W-BED(5:1)
+    MOVE IPD-BED-NO TO W-BED(6:2)
+    MOVE IPD-DT TO W-IPD-DT
+    MOVE IPD-SEQ TO W-IPD-SEQ1
+    INITIALIZE NID-MST-REC
+    MOVE "0503" TO NID-ID
+    IF W-RUN-PAR1(6:1) = "A"
+        MOVE W-RUN-PAR1(1:4)    TO NID-CODE
+    ELSE
+        MOVE IPD-MJ-DR          TO NID-CODE
+    END-IF
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00"
+        MOVE NID-MST-REC        TO W-NID-0503
+    ELSE
+        INITIALIZE W-NID-0503
+    END-IF
+    MOVE IPD-DPT TO HR-TMP-DPT
+    PERFORM F-SEARCH-DPT-RTN
+    MOVE HR-TMP-DPT-NAME TO W-DPT-NAME
+    MOVE IPD-MJ-DR TO HR-TMP-DR
+    PERFORM F-SEARCH-DR-RTN
+    MOVE HR-TMP-DR-NAME TO W-IPD-MJ-DR
+    MOVE IPD-RD-DR TO HR-TMP-DR
+    PERFORM F-SEARCH-DR-RTN
+    MOVE HR-TMP-DR-NAME TO W-IPD-RD-DR
+    DISPLAY DISPLAY S-RCB1.
+    CALL W$MENU USING WMENU-CHANGE, S-RCB1-Mn-1-Handle, W-DEL, 0, "&2. 查詢已刪除藥品", W-DEL
+    CALL W$MENU USING WMENU-SHOW, S-RCB1-Mn-1-Handle
+    INITIALIZE W-TYPE1
+
+PARAGRAPH: F-QTY-RTN
+    INITIALIZE W-LNK-DOSE-DATA
+    MOVE W-QTY1 TO W-LNK-DOSE-NUM
+    MOVE W-QTY2 TO W-LNK-DOSE-DEN
+    PERFORM F-CALL-HRDOSERF-RTN
+    MOVE W-LNK-DOSE-SUR TO W-DIS-QTY
+
+PARAGRAPH: F-CALL-HRDOSERF-RTN
+    IF W-NID-0503(272:1) = 1
+        MOVE "3"        TO W-LNK-DOSE-ID
+    ELSE
+        IF W-NID-0503(188:1) = "Y" THEN
+                         MOVE "3"        TO W-LNK-DOSE-ID
+                 ELSE
+                         MOVE "2"        TO W-LNK-DOSE-ID
+                 END-IF
+    END-IF
+    CALL HRDOSERF USING W-LNK-DOSE-DATA
+
+PARAGRAPH: F-ADD-RTB-QTY
+    INITIALIZE W-GCD-VAR, W-TMP-QTY
+    IF W-RTB-QTY1 = 0 OR W-RTB-QTY2 = 0
+        MOVE RTB-RX-QTY1        TO W-RTB-QTY1
+        MOVE RTB-RX-QTY2        TO W-RTB-QTY2
+    ELSE
+        COMPUTE W-TMP-QTY1 = RTB-RX-QTY1 * W-RTB-QTY2 +
+                                      RTB-RX-QTY2 * W-RTB-QTY1
+        COMPUTE W-TMP-QTY2 = RTB-RX-QTY2 * W-RTB-QTY2
+        MOVE W-TMP-QTY1         TO W-OUT-SON
+        MOVE W-TMP-QTY2         TO W-OUT-MOTHER
+        PERFORM F-DIVI-RTN
+        MOVE W-OUT-MOTHER       TO W-RTB-QTY2
+        MOVE W-OUT-SON          TO W-RTB-QTY1
+    END-IF
+
+PARAGRAPH: F-DIVI-RTN
+    DIVIDE W-OUT-SON BY W-OUT-MOTHER GIVING W-GG REMAINDER W-RR
+    IF W-RR > 0
+        MOVE 1 TO W-OUT-MOTHER
+        COMPUTE W-OUT-SON = W-GG + 1
+    ELSE
+        MOVE 1          TO W-OUT-MOTHER
+        MOVE W-GG       TO W-OUT-SON
+    END-IF
+
+PARAGRAPH: F-SCREEN-DOWN
+    IF W-PAGE = 100
+        PERFORM F-END-MESG
+    ELSE
+        IF NOT W-FS-EOF THEN
+*> START                 (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+*>                       MOVE W-DIS-REC(W-MENU-ITEMS) TO ECB-MST-REC
+                         IF W-RUN-CFNO-S = "1205" AND
+                            W-TMP-PARA = "B" THEN
+                                 IF W-DIS-REC(W-MENU-ITEMS) = SPACE THEN
+
+                                         INITIALIZE ECB-MST-REC
+                                         MOVE IPD-NO             TO ECB-IPD-NO
+                                         MOVE W-TMP-ECB-TYPE     TO ECB-TYPE
+                                 END-IF
+                         ELSE
+                                 MOVE W-DIS-REC(W-MENU-ITEMS) TO ECB-MST-REC
+                         END-IF
+*> END 106.11.09
+                         PERFORM F-STARTG-RTN
+                         PERFORM F-READN-RTN THRU F-READN-EXIT
+*> START                 (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+                         IF W-RUN-CFNO-S = "1205" AND
+                            W-TMP-PARA = "B" THEN
+                                 MOVE W-HRDTB-REC(W-MENU-ITEMS)  TO HRDTB-MST-REC
+                                 PERFORM F-START-HRDTB-RTN THRU F-START-HRDTB-EXIT
+                         END-IF
+*> END 106.11.09
+                         IF W-FS = 00 THEN
+                                 ADD 1   TO W-PAGE
+                                 MOVE ECB-MST-REC        TO W-KEY1(W-PAGE)
+*> START                         (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+*>                               PERFORM F-999-RTN
+                                 IF W-RUN-CFNO-S = "1205" AND
+                                    W-TMP-PARA = "B" THEN
+                                         MOVE HRDTB-MST-REC      TO W-KEY2(W-PAGE)
+                                         PERFORM F-READ-TEST-RTN THRU F-READ-TEST-EXIT
+                                 ELSE
+                                         PERFORM F-999-RTN
+                                 END-IF
+*> END 106.11.09
+*>                               ---(AICE) 98.05.15 電子病歷查印紀錄---
+                                 IF      L-PAM-LOG-YN     = "Y"       THEN
+                                         PERFORM F-CATCH-SEL-RTN
+                                 END-IF
+*>                               ----------------------------------------------
+                         ELSE
+                                 PERFORM F-END-MESG
+                         END-IF
+                 ELSE
+                         PERFORM F-END-MESG
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-SCREEN-UP
+    IF W-PAGE > 1
+        SUBTRACT 1 FROM W-PAGE
+        MOVE W-KEY1(W-PAGE)     TO ECB-MST-REC
+        PERFORM F-STARTS-RTN
+        PERFORM F-READN-RTN THRU F-READN-EXIT
+        IF W-RUN-CFNO-S = "1205" AND
+                    W-TMP-PARA = "B" THEN
+                         MOVE W-KEY2(W-PAGE)     TO HRDTB-MST-REC
+                         PERFORM F-START-HRDTB-RTN THRU F-START-HRDTB-EXIT
+                 END-IF
+        IF W-FS = 00 THEN
+*>                       算出正確的序號(翻頁時)
+                         MODIFY S-RCB1-GD-1, X = 1, Y = 2
+                         INQUIRE S-RCB1-GD-1, CELL-DATA IN W-NO
+                         COMPUTE W-NO = W-NO - 15
+*> START                 (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+*>                       PERFORM F-999-RTN
+                         IF W-RUN-CFNO-S = "1205" AND
+                            W-TMP-PARA = "B" THEN
+                                 PERFORM F-READ-TEST-RTN THRU F-READ-TEST-EXIT
+                         ELSE
+                                 PERFORM F-999-RTN
+                         END-IF
+*> END 106.11.09
+                 END-IF
+    ELSE
+        INITIALIZE W-NOTE
+        MOVE "本頁為可查詢資料第一頁！" TO W-NOTE
+        PERFORM F-WAR-NOTE
+    END-IF
+
+PARAGRAPH: F-SEARCH-IPLIF-RTN
+    INITIALIZE W-IPLIF-LNK
+    MOVE PAT-NO TO W-LNK-PAT-NO
+    CALL HRIPLIF USING W-IPLIF-LNK
+    IF W-LNK-IPL-YN = "Y"
+        PERFORM F-SEARCH-RTN
+    END-IF
+
+PARAGRAPH: F-SEARCH-RTN
+    EVALUATE W-TMP-PARA
+        WHEN "A"
+            PERFORM F-CHK-ECB1-RTN
+            PERFORM F-SEARCH-1-RTN
+        WHEN "B"
+            PERFORM F-CHK-ECB2-RTN
+            PERFORM F-SEARCH-2-RTN
+        WHEN "C"
+            PERFORM F-CHK-ECB1-RTN
+            PERFORM F-SEARCH-3-RTN
+    END-EVALUATE
+
+PARAGRAPH: F-SEARCH-1-RTN
+    IF W-FS = 10
+        MOVE "N"        TO W-LNK-IPL-YN
+        INITIALIZE W-NOTE
+        IF W-TYPE1 = "D" THEN
+                         MOVE "患者此次住院期間並無刪除整張處方！"       TO W-NOTE
+                 ELSE
+                         MOVE "患者此次住院期間並無開立藥品！"           TO W-NOTE
+                 END-IF
+        PERFORM F-ERR-NOTE
+    ELSE
+        PERFORM F-MOVE-INQ-TITLE
+        PERFORM F-RCB-RTN
+    END-IF
+
+PARAGRAPH: F-SEARCH-2-RTN
+    IF W-FS = 10
+        MOVE "N"        TO W-LNK-IPL-YN
+        INITIALIZE W-NOTE
+        MOVE "患者此次住院期間並無開立檢驗放射線！"     TO W-NOTE
+        PERFORM F-ERR-NOTE
+    ELSE
+        PERFORM F-MOVE-INQ-TITLE
+        MOVE 1           TO W-PAGE W-NO
+        MOVE ECB-MST-REC TO W-PICB W-KEY1(W-PAGE)
+        PERFORM F-999-RTN
+    END-IF
+
+PARAGRAPH: F-SEARCH-3-RTN
+    IF W-FS = 10
+        MOVE "N"        TO W-LNK-IPL-YN
+        INITIALIZE W-NOTE
+        IF W-TYPE1 = "D" THEN
+                         MOVE "患者此次住院期間並無刪除整張處方！"       TO W-NOTE
+                 ELSE
+                         MOVE "患者此次住院期間並無確認治療處置！"       TO W-NOTE
+                 END-IF
+        PERFORM F-ERR-NOTE
+    ELSE
+        PERFORM F-MOVE-INQ-TITLE
+        PERFORM F-RCB-RTN
+    END-IF
+
+PARAGRAPH: F-DEL-RTN
+    IF W-TYPE1 = "D"
+        INITIALIZE W-TYPE1
+        CALL "W$MENU" USING WMENU-CHANGE,S-RCB1-Mn-1-Handle,W-DEL,0,"&2. 查詢已刪除藥品", W-DEL
+    ELSE
+        MOVE "D"        TO W-TYPE1
+        CALL "W$MENU" USING WMENU-CHANGE,S-RCB1-Mn-1-Handle,W-DEL,0,"&2. 還原刪藥查詢", W-DEL
+    END-IF
+    CALL W$MENU USING WMENU-SHOW, S-RCB1-Mn-1-Handle
+    PERFORM F-RCB-RTN
+
+PARAGRAPH: F-END-MESG
+    INITIALIZE W-NOTE
+    MOVE "本頁為資料可查詢最末頁！" TO W-NOTE
+    PERFORM F-WAR-NOTE
+
+PARAGRAPH: F-F5-PRINT-RTN
+    IF W-DIS-DATA(W-GRID-Y)(65:6) = SPACE
+        INITIALIZE W-NOTE
+        MOVE "此項非檢驗連線項目，無法列印檢驗單！"     TO W-NOTE
+        PERFORM F-ERR-NOTE
+    ELSE
+        PERFORM F-PRINT-RTN
+    END-IF
+
+PARAGRAPH: F-PRINT-RTN
+    INITIALIZE W-REPRN-SW, W-ODRPF-REPRN-SW-LNK
+    INITIALIZE HTCHK-REC
+    MOVE W-DIS-CHK-NO(W-GRID-Y) TO HTCHK-CHK-NO
+    MOVE W-HTCHK-IP-DATE(W-GRID-Y) TO HTCHK-IP-DATE
+    READ HTCHK-MST KEY IS HTCHK-KEY
+    IF HTCHK-MST-STATUS = "00" AND HTCHK-CHK-NO = W-DIS-CHK-NO(W-GRID-Y)
+            AND HTCHK-IP-DATE = W-HTCHK-IP-DATE(W-GRID-Y)
+        INITIALIZE W-ODRPF-PASS-LNK W-ODRPF-PASS2-LNK
+        MOVE HTCHK-CHK-NO       TO W-ODRPF-CHK-NO-LNK
+        MOVE HTCHK-IP-DATE      TO W-ODRPF-IP-DATE-LNK
+        INITIALIZE W-ODR-LGP W-ODR-PRN
+        MOVE "Y"        TO W-ODR-LGP
+        CALL "HTODRPF" USING W-ODRPF-PASS-LNK W-ODRPF-PASS2-LNK
+                         W-ODRPF-PASS3-LNK ON EXCEPTION CONTINUE
+                 END-CALL
+        INITIALIZE W-ODR-LGP W-ODR-PRN
+    END-IF
+
+PARAGRAPH: F-REPORT-RTN
+    IF W-INQ-RX-WAY = SPACES
+        INITIALIZE W-NOTE
+        MOVE "此項處置無報告可供查詢！" TO W-NOTE
+        PERFORM F-ERR-NOTE
+    ELSE
+        MOVE "940"      TO W-EXT-HEIGHT
+        PERFORM F-CALL-HTPATRPF
+        INITIALIZE W-EXT-HEIGHT
+    END-IF
+
+PARAGRAPH: F-CALL-HTPATRPF
+    MOVE 'Y' TO W-HT-GUI-SW
+    INITIALIZE W-HTRPTICF-IP-DATE, W-HTRPTICF-RPT-OK, W-HTRPTICF-RPT-MESSAGE
+    MOVE W-HTCHK-IP-DATE(W-GRID-Y) TO W-HTRPTICF-IP-DATE
+    CALL HTRPTICF USING W-RUN-CHK, "HR", "V", W-DIS-CHK-NO(W-GRID-Y), W-HTRPTICF-IP-DATE, W-HTRPTICF-RPT-OK, W-HTRPTICF-RPT-MESSAGE
+    CANCEL "HTRPTICF"
+    INITIALIZE W-HT-GUI-SW
+    IF W-HTRPTICF-RPT-OK = "N"
+        INITIALIZE W-NOTE
+        MOVE W-HTRPTICF-RPT-MESSAGE     TO W-NOTE
+        PERFORM F-ERR-NOTE
+    END-IF
+
+PARAGRAPH: F-HT-DATA-RTN
+    INITIALIZE W-HT-DATA
+    MOVE W-DIS-ITM-NM(W-GRID-Y) TO W-HT-DATA-TITLE, W-ITM-NM
+    INITIALIZE NID-MST-REC
+    MOVE "5100" TO NID-ID
+    MOVE W-DIS-AC-MAN(W-GRID-Y) TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00" AND NID-ID = "5100" AND
+            NID-CODE = W-DIS-AC-MAN(W-GRID-Y)
+        MOVE NID-NAME   TO W-AC-NAME
+    ELSE
+        MOVE SPACE      TO W-AC-NAME
+    END-IF
+    MOVE W-DIS-AC-DATE(W-GRID-Y) TO W-AC-DATE
+    MOVE W-DIS-AC-HH(W-GRID-Y) TO W-AC-TIME(1:2)
+    MOVE ":" TO W-AC-TIME(3:1)
+    MOVE W-DIS-AC-MM(W-GRID-Y) TO W-AC-TIME(4:2)
+    MOVE ":" TO W-AC-TIME(6:1)
+    MOVE W-DIS-AC-SS(W-GRID-Y) TO W-AC-TIME(7:2)
+    MOVE W-DIS-SPL-NM(W-GRID-Y) TO W-SPL-NM
+    MOVE W-DIS-BTL-NM(W-GRID-Y) TO W-BTL-NM
+    MOVE W-DIS-RP-F-NAME TO W-RP-F-NAME
+    MOVE W-DIS-RP-L-NAME TO W-RP-L-NAME
+    MOVE W-DIS-RP-DATE(W-GRID-Y) TO W-RP-DATE
+    MOVE W-DIS-RP-HH(W-GRID-Y) TO W-RP-TIME(1:2)
+    MOVE ":" TO W-RP-TIME(3:1)
+    MOVE W-DIS-RP-MM(W-GRID-Y) TO W-RP-TIME(4:2)
+    MOVE ":" TO W-RP-TIME(6:1)
+    MOVE W-DIS-RP-SS(W-GRID-Y) TO W-RP-TIME(7:2)
+    DISPLAY DISPLAY S-HT-DATA-FR S-HT-DATA.
+
+PARAGRAPH: F-DELETE-RTN
+    IF W-NID-1198(255:1) = "Y"
+        INITIALIZE W-NOTE
+        MOVE "對不起！您無權使用此功能！請持退單由住院中心刪除！"       TO W-NOTE
+        PERFORM F-ERR-NOTE
+    ELSE
+        IF W-IPD-MARK = SPACE THEN
+                         IF W-RUN-GNO1 = "11" AND W-RUN-PAR1(6:1) = "A" THEN
+                                 PERFORM F-HT-DELETE-RTN THRU F-HT-DELETE-EXIT
+                                 PERFORM F-CHK-ECB2-RTN
+*> START                         (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+                                 IF W-RUN-CFNO-S = "1205" THEN
+                                         INITIALIZE HRDTB-MST-REC
+                                         MOVE IPD-NO     TO HRDTB-IPD-NO
+                                         PERFORM F-START-HRDTB-RTN THRU F-START-HRDTB-EXIT
+                                 END-IF
+*> END 106.11.09
+                                 IF W-FS = 10 THEN
+                                         INITIALIZE W-DIS-TABLE
+                                         MOVE "N"        TO W-LNK-IPL-YN
+ *> 97.12.25(MONIYA)基隆李宏珠說看到很礙眼
+ *>                                        INITIALIZE W-NOTE
+ *>                                        MOVE "患者此次住院期間並無開立檢驗放射線！"     TO W-NOTE
+ *>                                        PERFORM F-ERR-NOTE
+ *> 97.09.02(MONIYA)測試修改基隆刪除更新畫面資料
+                                         PERFORM F-FUN-RTN THRU F-FUN-EXIT
+                                 ELSE
+*> START                                 (AICE) 106.11.09 增加顯示已刪除之檢驗項目
+*>                                       PERFORM F-PICB-RTN
+                                         IF W-RUN-CFNO-S = "1205" THEN
+                                                 MOVE 1          TO W-PAGE W-NO
+                                                 MOVE ECB-MST-REC        TO W-PICB W-KEY1(W-PAGE)
+                                                 MOVE HRDTB-MST-REC      TO W-KEY2(W-PAGE)
+                                                 PERFORM F-READ-TEST-RTN THRU F-READ-TEST-EXIT
+                                         ELSE
+                                                 PERFORM F-PICB-RTN
+                                         END-IF
+*> END 106.11.09
+                                 END-IF
+                         ELSE
+                                 INITIALIZE W-NOTE
+                                 MOVE "對不起！刪除功能僅限醫師使用！"   TO W-NOTE
+                                 PERFORM F-ERR-NOTE
+                         END-IF
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-HT-DELETE-RTN
+    MOVE W-DIS-REC(W-GRID-Y)(12:7) TO W-CHK-DTE-YMD
+    PERFORM F-CHK-LOCK-RTN THRU F-CHK-LOCK-EXIT
+    IF W-LOCKCF-YN = "Y"
+        INITIALIZE W-NOTE
+        MOVE W-LOCKCF-NOTE TO W-NOTE
+        PERFORM F-ERR-NOTE
+        GO TO F-HT-DELETE-EXIT
+    END-IF
+    IF W-DIS-OPD-APY(W-GRID-Y) = "Y"
+        STRING "此項處置已轉由門診申報，無法刪除！！"
+                         DELIMITED BY SIZE INTO W-NOTE
+                 END-STRING
+        PERFORM F-ERR-NOTE
+        GO TO F-HT-DELETE-EXIT
+    END-IF
+    IF W-DIS-CHK-NO(W-GRID-Y) NOT = SPACE AND
+            W-DIS-CHK-NO(W-GRID-Y) NOT = "   00000"
+        INITIALIZE W-ODRW-TABLE
+        MOVE W-DIS-REC(W-GRID-Y)(1:11)          TO W-ODRW-PD-NO
+        MOVE W-DIS-REC(W-GRID-Y)(12:11)         TO W-ODRW-PD-SEQ
+        MOVE W-DIS-REC(W-GRID-Y)(23:3)          TO W-ODRW-PRS-SEQ
+        MOVE W-DIS-CHK-NO(W-GRID-Y)             TO W-ODRW-CHK-NO
+        MOVE W-DIS-ITM-CD(W-GRID-Y)             TO W-ODRW-ITM-CD
+        CALL "HTODRWCF" USING W-ODRW-TABLE ON EXCEPTION CONTINUE
+                 END-CALL
+        IF W-ODRW-TRN-SW NOT = "Y"
+                         INITIALIZE W-NOTE
+*>                       作業流程名稱
+                         STRING "此項處置已至" W-ODRW-WK-NAME "階段，無法刪除"
+                                 DELIMITED BY SIZE INTO W-NOTE
+                         END-STRING
+                         PERFORM F-ERR-NOTE
+                         GO TO F-HT-DELETE-EXIT
+                 ELSE
+                         PERFORM F-HT-DELETE-RTN2
+                 END-IF
+    ELSE
+        IF W-DIS-REC(W-GRID-Y) NOT = SPACE THEN
+                         PERFORM F-HT-DELETE-RTN2
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-HT-DELETE-EXIT
+    EXIT
+
+PARAGRAPH: F-HT-DELETE-RTN2
+    INITIALIZE W-HRMESCF-DATA, W-HRMESCF-DATA2
+    MOVE "2" TO W-HRMESCF-PIC-TYPE
+    MOVE "4" TO W-HRMESCF-BUT-TYPE
+    MOVE "Y" TO W-HRMESCF-CONTROL-ID
+    MOVE "是否確定要刪除??" TO W-HRMESCF-NOTE(1)
+    CALL HRMESCF USING W-HRMESCF-DATA, W-HRMESCF-DATA2
+    IF W-HRMESCF-RETURN = "Y"
+        INITIALIZE W-DELETE-YN
+        PERFORM F-CHK-DEL-RTN THRU F-CHK-DEL-EXIT
+        IF W-DELETE-YN = "Y" THEN
+*>               確定要刪除時若為連線項則要先CALL "HTICB2BF"
+                     IF (W-DIS-CHK-NO(W-GRID-Y) NOT = SPACE AND "   00000") THEN
+*>               0930826 志彥說.這個不要審
+*>                  AND W-DIS-ITM-CD(W-GRID-Y) NOT = SPACE THEN
+*> START                 (彙婷) 106.06.07 桃醫-檢驗放射線查詢作業刪除檢驗單時，需重印重驗單-加傳 W-HTICB2BF-LNK2、加傳檢驗單號
+*>                               W-HTICB2BF-LNK -> L-HTICB2BF-LNK
+                         INITIALIZE L-HTICB2BF-LNK  L-HTICB2BF-LNK2
+                         MOVE "1"                        TO L-HTICB2BF-STATUS
+                         MOVE W-DIS-REC(W-GRID-Y)(1:22)  TO L-HTICB2BF-IP-NO
+                         MOVE W-RUN-USER                 TO L-HTICB2BF-CR-MAN
+                         MOVE W-DATE                     TO L-HTICB2BF-CR-DATE
+*> START                 (AICE) 99.07.19 DM1001-J1002025 MEMORY ACCESS 加WITH CONVERT
+                         MOVE W-TIME                     TO L-HTICB2BF-CR-TIME 
+
+                         MOVE W-DIS-REC(W-GRID-Y)        TO ECB-MST-REC
+                         MOVE ECB-APY-DR                 TO L-HTICB2BF-IP-MAN
+*> START 106.07.06       (彙婷) 禮中反應刪除時，要加傳處方日
+                         MOVE W-DIS-REC(W-GRID-Y)(12:7)  TO L-HTICB2BF-IP-DATE 
+*> END 106.07.06
+                         IF W-RUN-CFNO-S = "1205" THEN
+                                 MOVE W-DIS-CHK-NO(W-GRID-Y)     TO L-HTICB2BF-CHK-NO
+                                 CALL "HTICB2BF" USING L-HTICB2BF-LNK , L-HTICB2BF-LNK2 ON EXCEPTION CONTINUE
+                                 END-CALL
+                         ELSE
+                                 CALL "HTICB2BF" USING L-HTICB2BF-LNK ON EXCEPTION CONTINUE
+                                 END-CALL
+                         END-IF
+                         IF L-HTICB2BF-STATUS = "E" THEN
+*> END 106.06.07
+                                 INITIALIZE W-NOTE
+                                 STRING "檢驗檢查放射線系統處理失敗！請重新執行此功能！"
+                                         DELIMITED BY SIZE INTO W-NOTE
+                                 END-STRING
+                                 PERFORM F-ERR-NOTE
+                         ELSE
+                                 PERFORM F-HT-DELETE-RTN3
+                         END-IF
+                     ELSE
+                         PERFORM F-HT-DELETE-RTN3
+                     END-IF
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-CHK-DEL-RTN
+    INITIALIZE IPD-MST-REC
+    MOVE W-DIS-REC(W-GRID-Y)(1:11) TO IPD-NO
+    READ IPD-MST KEY IS IPD-MST-KEY
+    IF IPD-MST-STATUS = "00"
+        INITIALIZE IKEY-TMP-REC
+        MOVE "A"        TO IKEY-TMP-ID
+        MOVE IPD-PAT-NO TO IKEY-ENA-PAT-NO
+        READ IKEY-TMP KEY IS IKEY-TMP-KEY
+        IF IKEY-TMP-STATUS = "00" THEN
+                         DISPLAY MESSAGE "患者使用中，使用者[ " IKEY-USER " ]，作業 [ " IKEY-JOB " ]"
+                         MOVE "N"        TO W-DELETE-YN
+                         GO TO F-CHK-DEL-EXIT
+                 END-IF
+        EVALUATE        TRUE
+        INITIALIZE      NID-MST-REC
+        MOVE    "0106"          TO      NID-ID
+        MOVE    IPD-A-CLA       TO      NID-CODE
+        READ    NID-MST   KEY   IS      NID-MST-KEY
+        IF      NID-MST-STATUS = "00"
+                         IF NID-MST-REC(93:1) NOT = "1" AND "2" AND "3" THEN
+                                 MOVE    "身分代碼計價識別錯誤，請檢查！"        TO      W-NOTE
+                                 DISPLAY MESSAGE W-NOTE
+                                 MOVE "N"        TO W-DELETE-YN
+                                 GO TO F-CHK-DEL-EXIT
+                         END-IF
+                 END-IF
+        MOVE "Y"        TO W-DELETE-YN
+    END-IF
+
+PARAGRAPH: F-CHK-DEL-EXIT
+    EXIT
+
+PARAGRAPH: F-HT-DELETE-RTN3
+    PERFORM F-DEL-SCH-RTN
+    INITIALIZE IPD-MST-REC
+    MOVE W-DIS-REC(W-GRID-Y)(1:11) TO IPD-NO
+    READ IPD-MST KEY IS IPD-MST-KEY
+    IF IPD-MST-STATUS = "00" AND IPD-NO = W-DIS-REC(W-GRID-Y)(1:11)
+        REWRITE IPD-MST-REC
+        IF IPD-MST-STATUS = "00" THEN
+*>                       修改ICA
+                         INITIALIZE ICA-MST-REC
+                         MOVE W-DIS-REC(W-GRID-Y)(1:11)          TO ICA-IPD-NO
+                         MOVE W-DIS-REC(W-GRID-Y)(12:11)         TO ICA-ODR-NO
+                         READ ICA-MST KEY IS ICA-KEY
+                         IF ICA-MST-STATUS = "00" AND
+                            ICA-IPD-NO = W-DIS-REC(W-GRID-Y)(1:11) AND
+                            ICA-ODR-NO = W-DIS-REC(W-GRID-Y)(12:11) THEN
+*>  97.7.23(金額重結)
+                                 INITIALIZE W-ODRW-LNK W-ODRW-CNT
+                                 ADD   1                        TO W-ODRW-CNT
+*> 修改處方
+                                 MOVE "HR"                      TO W-ODRW-FROM
+                                 MOVE "M"                       TO W-ODRW-ID
+                                 MOVE ICA-ODR-NO                TO WM-ICA-ODR-NO
+*> 刪除處置
+                                 MOVE "D"                       TO WM-ICB-ID(W-ODRW-CNT)
+                                 MOVE W-RUN-USID(1:5)           TO W-ODRW-USER
+                                 MOVE W-DIS-REC(W-GRID-Y)(1:11) TO W-ODRW-IPD-NO
+ *>                                MOVE "D" TO WM-ICB-ID(1)
+ *>                                MOVE W-DIS-REC(W-GRID-Y)(23:3) TO WM-ICB-FEE-SEQ(1)
+                                 MOVE W-DIS-REC(W-GRID-Y)(23:3) TO WM-ICB-FEE-SEQ(W-ODRW-CNT)
+ *>                                CALL "HIODRWCF" USING W-RUN-CHK W-ODRW-LNK ON EXCEPTION CONTINUE
+ *>                                END-CALL
+*> end
+
+*>                               先將目前ICA及ICB之資料暫存於WRK中
+ *>                                MOVE ICA-MST-REC        TO W-ICA-TMP-MST-REC
+*>                               處方異動人代號  X(4) ==> X(5)
+ *>                                MOVE W-RUN-USID         TO ICA-UPD-USR-ID
+*>                               處方異動日期
+ *>                                 MOVE W-DATE             TO ICA-UPD-DATE
+*>                               處方異動時間
+ *>                                 MOVE W-TIME             TO ICA-UPD-TIME
+ *>                                 REWRITE ICA-MST-REC
+*>                               891121 INSERT : 電子病歷異動檔寫檔   <HI_ELC.PRC>
+                                 MOVE "M"        TO W-ELC-MARK
+                                 PERFORM F-WRITE-ELC-TRN-21
+ *>                                 IF ICA-MST-STATUS = "00" THEN
+*>                                       異動前
+ *>                                        MOVE "MD"       TO W-UPD-ID
+ *>                                         PERFORM F-WRITE-GCA-OLD-RTN THRU F-WRITE-GCA-OLD-EXIT
+ *>                                         PERFORM F-WRITE-GCB-MI-RTN
+*>                                       0900620增加若此項目為連帶母項則要先刪除子項之後再將母項刪除
+                                         INITIALIZE ECB-MST-REC
+                                         MOVE W-DIS-REC(W-GRID-Y)(1:25)  TO ECB-KEY
+                                         READ ECB-MST KEY IS ECB-KEY
+                                         IF ECB-LNK-POINT-HEAD = "*" THEN
+                                                 MOVE ECB-LNK-POINT      TO W-TMP-LNK-POINT
+                                                 MOVE ECB-LNK-TIME       TO W-TMP-LNK-TIME
+                                                 PERFORM F-DEL-LNK-RTN
+                                         END-IF
+*>                                       2019/12/24 耀瑄NIS
+*>                                       刪除時加寫HR_UDL3
+                                         INITIALIZE ICB-MST-REC ECB-MST-REC
+                                         MOVE W-DIS-REC(W-GRID-Y)(1:25)  TO ICB-KEY ECB-KEY
+
+                                         READ ICB-MST KEY IS ICB-KEY
+                                         READ ECB-MST KEY IS ECB-KEY
+                                         PERFORM F-DEL-TO-WRITE-HRUDL3-RTN
+*>                                       2019/12/24 END
+*>                                       刪除ICB及ECB
+                                         INITIALIZE ICB-MST-REC ECB-MST-REC
+                                         MOVE W-DIS-REC(W-GRID-Y)(1:25)  TO ICB-KEY ECB-KEY
+                                         READ ICB-MST KEY IS ICB-KEY
+                                         READ ECB-MST KEY IS ECB-KEY
+*>                                       處理ANN取消作業
+                                         IF ECB-ANN-YN = "Y" THEN
+                                                 PERFORM F-DEL-ANN-MST
+                                         END-IF
+*>                                       930820 增加子宮頸抹片處置審核檔刪除 PEF-MST-REC(462:1) = "D"
+                                         IF W-1799-REC(69:1) = "Y" THEN
+                                                 PERFORM F-DELETE-FNS-RTN
+                                         END-IF
+*>                                       0941206 增加寫入檢驗刪除處方檔
+                                         PERFORM F-WRITE-HRDTB-RTN
+ *>                                        DELETE ICB-MST
+ *>                                         DELETE ECB-MST
+*>                                       異動後
+                                         PERFORM F-ADD-MT-RTN THRU F-ADD-MT-EXIT
+ *>                                         MOVE "MI"       TO W-UPD-ID
+ *>                                         MOVE ICA-MST-REC        TO W-ICA-TMP-MST-REC
+ *>                                         PERFORM F-WRITE-GCA-OLD-RTN THRU F-WRITE-GCA-OLD-EXIT
+ *>                                         PERFORM F-WRITE-GCB-MI-RTN
+*>                                       檢查處方是否已無內容若無則於ICA-DEL-MARK上刪除註記
+ *>                                        PERFORM F-REWRITE-ICA-RTN
+ *>                                ELSE
+*>                                       處方主檔異動失敗
+ *>                                        INITIALIZE W-NOTE
+ *>                                        STRING "處方主檔異動失敗，狀況："
+ *>                                              ICA-MST-STATUS " 請重新執行此功能......"
+ *>                                                DELIMITED BY SIZE INTO W-NOTE
+ *>                                        END-STRING
+ *>                                        PERFORM F-ERR-NOTE
+ *>                                END-IF
+                                 CALL "HIODRWCF" USING W-RUN-CHK W-ODRW-LNK ON EXCEPTION CONTINUE
+                                 END-CALL
+ *> 97.09.17(MONIYA)顯示錯誤訊息
+                                 IF W-ODRW-OK = "N" THEN
+                                         INITIALIZE W-NOTE
+                                         MOVE W-ODRW-NOTE TO W-NOTE
+                                         PERFORM F-ERR-NOTE
+*>                                       2019/12/24 記錄ICA寫檔錯誤碼[7]
+                                         INITIALIZE  W-LOG2-CON
+                                         MOVE "W"        TO W-UPD-MRK
+                                         MOVE "A"        TO W-TMP-ID
+                                         PERFORM F-WRT-LOG2-RTN THRU F-WRT-LOG2-EXIT
+                                 END-IF
+                         ELSE
+*>                               處方主檔讀取失敗
+ *>                                INITIALIZE W-NOTE
+ *>                                STRING "處方主檔讀取失敗，狀況："
+ *>                                        ICA-MST-STATUS " 請查詢此處方是否存在...."
+ *>                                        DELIMITED BY SIZE INTO W-NOTE
+
+ *>                                END-STRING
+ *>                                PERFORM F-ERR-NOTE
+*>                               2019/12/24 記錄ICA寫檔錯誤碼[7]
+                                 INITIALIZE  W-LOG2-CON
+                                 MOVE "R"        TO W-UPD-MRK
+                                 MOVE "A"        TO W-TMP-ID
+                                 PERFORM F-WRT-LOG2-RTN THRU F-WRT-LOG2-EXIT
+ *>                        END-IF
+*>                       0910501 依參數設定傳送取消處方箋
+                 ELSE
+*>                       住院主檔更新失敗
+                         INITIALIZE W-NOTE
+                         STRING "住院主檔更新失敗，狀況：" IPD-MST-STATUS
+                                 " 請重新執行此功能......"
+                                 DELIMITED BY SIZE INTO W-NOTE
+                         END-STRING
+                         PERFORM F-ERR-NOTE
+                 END-IF
+    ELSE
+        INITIALIZE W-NOTE
+        STRING "住院主檔讀取失敗，狀況：" IPD-MST-STATUS
+                         " 請查詢此住院資料是否存在...."
+                         DELIMITED BY SIZE INTO W-NOTE
+                 END-STRING
+        PERFORM F-ERR-NOTE
+    END-IF
+
+PARAGRAPH: F-DEL-LNK-RTN
+    INITIALIZE ECB-MST-REC
+    MOVE W-DIS-REC(W-GRID-Y)(1:22) TO ECB-KEY
+    START START ECB-MST KEY IS NOT < ECB-KEY
+    READ ECB-MST NEXT
+    PERFORM F-DEL-LNK-RTN1 UNTIL ECB-MST-STATUSNOT="00"ORECB-KEY(1:22)NOT=W-DIS-REC(W-GRID-Y)(1:22)
+
+PARAGRAPH: F-DEL-LNK-RTN1
+    IF ECB-LNK-POINT-HEAD NOT = "*" AND
+            ECB-LNK-POINT = W-TMP-LNK-POINT AND
+            ECB-LNK-TIME = W-TMP-LNK-TIME AND
+            ECB-KEY(1:22) = W-DIS-REC(W-GRID-Y)(1:22)
+        INITIALIZE ICB-MST-REC
+        MOVE ECB-KEY    TO ICB-KEY
+        READ ICB-MST KEY IS ICB-KEY
+        IF (ICB-DG-FLAG(1:1) = "C" OR "D" OR "E") AND
+                    ICB-CLS-NO NOT = SPACE THEN
+                         INITIALIZE W-ODRW-TABLE
+*>                       住院序號
+                         MOVE ICB-IPD-NO         TO W-ODRW-PD-NO
+*>                       處方序號
+                         MOVE ICB-ODR-NO         TO W-ODRW-PD-SEQ
+*>                       處置序號
+                         MOVE ICB-FEE-SEQ        TO W-ODRW-PRS-SEQ
+*>                       檢驗單號
+                         MOVE ICB-CHK-NO         TO W-ODRW-CHK-NO
+*>                       項目代碼
+                         MOVE ICB-ITM-CD         TO W-ODRW-ITM-CD
+                         CALL "HTODRWCF" USING W-ODRW-TABLE ON EXCEPTION CONTINUE
+
+                         END-CALL
+*>                       表示可刪
+                         IF W-ODRW-TRN-SW = "Y" THEN
+                                 ADD 1 TO W-ODRW-CNT
+*>                               刪除處置
+                                 MOVE "D"          TO WM-ICB-ID(W-ODRW-CNT)
+*>                               處置流水號
+                                 MOVE ICB-FEE-SEQ  TO WM-ICB-FEE-SEQ(W-ODRW-CNT)
+ *>                                DELETE ICB-MST
+ *>                                DELETE ECB-MST
+                         END-IF
+                 ELSE
+                         ADD 1 TO W-ODRW-CNT
+*>                       刪除處置
+                         MOVE "D"          TO WM-ICB-ID(W-ODRW-CNT)
+*>                       處置流水號
+                         MOVE ICB-FEE-SEQ  TO WM-ICB-FEE-SEQ(W-ODRW-CNT)
+ *>                        DELETE ICB-MST
+ *>                        DELETE ECB-MST
+                 END-IF
+    END-IF
+    READ ECB-MST NEXT
+
+PARAGRAPH: F-DEL-SCH-RTN
+    INITIALIZE ICA-MST-REC
+    MOVE W-DIS-REC(W-GRID-Y)(1:11) TO ICA-IPD-NO
+    MOVE W-DIS-REC(W-GRID-Y)(12:11) TO ICA-ODR-NO
+    READ ICA-MST KEY IS ICA-KEY
+    INITIALIZE ICB-MST-REC, ECB-MST-REC
+    MOVE W-DIS-REC(W-GRID-Y)(1:25) TO ICB-KEY, ECB-KEY
+    READ ICB-MST KEY IS ICB-KEY
+    READ ECB-MST KEY IS ECB-KEY
+    INITIALIZE PEF-MST-REC
+    INITIALIZE LX-SCH-TABLE, W-LX-SCH-COUNT
+    MOVE ICB-FEE-KEY TO PEF-CODE
+    READ PEF-MST KEY IS PEF-MST-KEY
+    IF PEF-MST-STATUS = "00" AND PEF-CODE(1:9) = ICB-FEE-KEY
+        IF PEF-MST-REC(436:01) = "Y" THEN
+                         ADD 1                   TO W-LX-SCH-COUNT
+                         MOVE "D"                TO LX-SCH-CMD-ISW(W-LX-SCH-COUNT)
+                         MOVE ICB-FEE-KEY        TO LX-SCH-PRS-NO(W-LX-SCH-COUNT)
+                         MOVE ICB-PAS-DPT        TO LX-SCH-PRS-DPT(W-LX-SCH-COUNT)
+                         MOVE ICB-PAS-TAB        TO LX-SCH-PRS-CLS(W-LX-SCH-COUNT)
+                         MOVE ICB-PAS-ITM        TO LX-SCH-PRS-ITM(W-LX-SCH-COUNT)
+                         MOVE ICB-FEE-SEQ        TO LX-SCH-PRS-SEQ(W-LX-SCH-COUNT)
+                         MOVE ICB-FEE-SEQ        TO LX-SCH-CRE-SEQ(W-LX-SCH-COUNT)
+                         INITIALIZE W-LNK-TABLE
+                         MOVE "X1"               TO W-SYS-NO
+                         MOVE W-RUN-USID         TO W-USE-NO
+                         MOVE "X"                TO W-DPT-NO
+                         MOVE "YYYYY"            TO W-PWD
+                         MOVE IPD-PAT-NO         TO LX-SCH-PT-NO
+                         MOVE PAT-IDNO           TO LX-SCH-PT-ID
+                         MOVE PAT-NAME           TO LX-SCH-PT-NAME
+                         MOVE PAT-BIRTH-DT       TO LX-SCH-PT-DATE
+
+                         MOVE PAT-SEX            TO LX-SCH-PT-SEX
+*> START                 (AICE) 101.08.31 DM1201-J1201492 MAV
+                         MOVE IPD-NO             TO LX-SCH-PD-NO 
+ *> 
+                         MOVE IPD-BED            TO LX-SCH-PT-BED
+                         MOVE ICA-ODR-NO         TO LX-SCH-OD-NO
+*>                       儲存目前患者紀錄
+                         PERFORM F-BEFORE-RTN
+                         CALL "HXGSCHKF" USING W-LNK-TABLE LX-SCH-TABLE ON EXCEPTION CONTINUE
+                         END-CALL
+                         CANCEL "HXGSCHKF"
+*>                       還原患者紀錄
+                         PERFORM F-AFTER-RTN
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-WRITE-GCB-MI-RTN
+    INITIALIZE ICB-MST-REC
+    MOVE ICA-IPD-NO TO ICB-IPD-NO
+    MOVE ICA-ODR-NO TO ICB-ODR-NO
+    START START ICB-MST KEY IS NOT < ICB-KEY
+    READ ICB-MST NEXT
+    PERFORM F-WRITE-GCB-MI-RTN1 UNTIL ICB-MST-STATUSNOT="00"ORICB-IPD-NONOT=ICA-IPD-NOORICB-ODR-NONOT=ICA-ODR-NO
+
+PARAGRAPH: F-WRITE-GCB-MI-RTN1
+    INITIALIZE ECB-MST-REC
+    MOVE ICB-KEY TO ECB-KEY
+    READ ECB-MST KEY IS ECB-KEY
+    MOVE ICB-MST-REC TO W-MST-REC
+    MOVE ECB-MST-REC TO W-ECB-REC
+    PERFORM F-WRITE-GCB-RTN THRU F-WRITE-GCB-EXIT
+    READ ICB-MST NEXT
+
+PARAGRAPH: F-REWRITE-ICA-RTN
+    INITIALIZE ICB-MST-REC
+    MOVE W-DIS-REC(W-GRID-Y)(1:11) TO ICB-IPD-NO
+    MOVE W-DIS-REC(W-GRID-Y)(12:11) TO ICB-ODR-NO
+    START START ICB-MST KEY IS NOT < ICB-KEY
+    READ ICB-MST NEXT
+    IF ICB-MST-STATUS NOT = "00" OR ICB-IPD-NO NOT = W-DIS-REC(W-GRID-Y)(1:11) OR
+            ICB-ODR-NO NOT = W-DIS-REC(W-GRID-Y)(12:11)
+        MOVE "D"        TO ICA-DEL-MARK
+        REWRITE ICA-MST-REC
+    END-IF
+
+PARAGRAPH: F-DELETE-FNS-RTN
+    INITIALIZE W-GCK-CHK
+    IF ECB-SPEC-MARK = "D"
+        MOVE "Y"        TO W-GCK-CHK
+    END-IF
+    IF W-GCK-CHK = SPACE
+        INITIALIZE FNS-MST-REC
+        MOVE "Q"                                TO FNS-ID
+        MOVE W-DIS-REC(W-GRID-Y)(1:11)          TO FNS-PQ-IPD-NO
+        MOVE W-DIS-REC(W-GRID-Y)(12:11)         TO FNS-PQ-ODR-NO
+        READ FNS-MST KEY IS FNS-MST-KEY
+        IF FNS-MST-STATUS = "00" THEN
+                         DELETE FNS-MST
+                         IF FNS-MST-STATUS NOT = "00" THEN
+                                 INITIALIZE W-NOTE
+                                 STRING "子宮頸抹片記錄檔刪除失敗，狀況：" FNS-MST-STATUS
+                                         DELIMITED BY SIZE INTO W-NOTE
+                                 END-STRING
+                                 PERFORM F-ERR-NOTE
+                         END-IF
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-WRITE-HRDTB-RTN
+    ADD 1   TO W-HRDTA-COUNT
+    IF W-HRDTA-COUNT = 1
+        PERFORM F-WRITE-HRDTA-RTN
+    END-IF
+    INITIALIZE HRDTB-MST-REC
+    MOVE HRDTA-IPD-NO TO HRDTB-IPD-NO
+    MOVE HRDTA-ODR-NO TO HRDTB-ODR-NO
+    MOVE W-HRDTA-COUNT TO HRDTB-FEE-SEQ
+    MOVE ICB-FEE-KEY TO HRDTB-FEE-KEY
+    MOVE ICB-RX-QTY TO HRDTB-RX-QTY
+    MOVE ICB-CHK-NO TO HRDTB-CHK-NO
+    MOVE ICB-INS-DATE TO HRDTB-IP-DATE
+    MOVE ICB-ODR-NO TO HRDTB-ICA-ODR-NO
+    MOVE ICB-ITM-CD TO HRDTB-ICB-ITM-CD
+    WRITE WRITE HRDTB-MST-REC
+
+PARAGRAPH: F-WRITE-HRDTA-RTN
+    MOVE W-RUN-YYSW TO W-YMD-YYSW
+    MOVE W-RUN-YYDEF TO W-YMD-YYDEF
+    MOVE W-RUN-YYCOM TO W-YMD-YYCOM
+    ACCEPT W-YMD-DATE FROM ENVIRONMENT CENTURY-DATE
+    MOVE W-YMD-YY TO W-YMD-YYB
+    MOVE W-YMD-YY TO W-YMD-YY1
+    MOVE W-YMD-MM TO W-YMD-MM1
+    MOVE W-YMD-DD TO W-YMD-DD1
+    IF W-YMD-YYCOM NOT = "+" AND "-"
+        ACCEPT W-YMD-YYSW       FROM ENVIRONMENT "ZS_SYYW"
+                 END-ACCEPT
+        ACCEPT W-YMD-YDFSW      FROM ENVIRONMENT "ZS_SYDF"
+                 END-ACCEPT
+        ACCEPT W-YMD-YYCOM      FROM ENVIRONMENT "ZS_SYCM"
+                 END-ACCEPT
+        IF W-YMD-YYSW NOT = "2" AND "4" THEN
+                         MOVE "0" TO W-YMD-YYSW
+                 END-IF
+        IF W-YMD-YYCOM NOT = "+" AND "-" THEN
+                         MOVE "-" TO W-YMD-YYCOM
+                 END-IF
+        MOVE W-YMD-YDFSW TO W-YMD-YYDEF
+        IF ( W-YMD-YYDEF = 0 ) AND
+                    ( W-YMD-YYSW  = "0" ) AND
+                    ( W-YMD-YYCOM = "-" ) THEN
+                         MOVE 1911 TO W-YMD-YYDEF
+                 END-IF
+    END-IF
+    MOVE SPACE TO W-YMD-YYS
+    IF W-YMD-YYSW = "4"
+        CONTINUE
+    ELSE
+        IF W-YMD-YYSW = "2" THEN
+                 MOVE W-YMD-YY1 TO W-YMD-YY
+         ELSE    IF W-YMD-YYCOM = "+" THEN
+                         COMPUTE W-YMD-YY = W-YMD-YY + W-YMD-YYDEF
+                 ELSE    IF W-YMD-YY > W-YMD-YYDEF THEN
+                                 COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF
+                         ELSE    COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF - 1
+                                 MOVE "-" TO W-YMD-YYS
+                         END-IF
+                 END-IF
+         END-IF
+    END-IF
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+    PERFORM F-READ-RNUJ-RTN THRU F-READ-RNUJ-EXIT
+    INITIALIZE HRDTA-MST-REC
+    MOVE ICB-IPD-NO TO HRDTA-IPD-NO
+    MOVE W-DATE TO HRDTA-INS-DATE
+    MOVE W-NUM TO HRDTA-ODR-SEQ
+    IF W-RUN-PAR1(6:1) = "A"
+        MOVE W-RUN-PAR1(1:4)    TO HRDTA-DR-NO
+    END-IF
+    MOVE W-RUN-USID TO HRDTA-USR-ID
+    MOVE W-DATE TO HRDTA-CRE-DT
+    MOVE W-TIME TO HRDTA-CRE-TIME
+    WRITE WRITE HRDTA-MST-REC
+
+PARAGRAPH: F-READ-RNUJ-RTN
+    INITIALIZE RNU-MST-REC
+    MOVE "J" TO RNU-J-ID
+    MOVE W-DATE TO RNU-J-DT
+    READ RNU-MST KEY IS RNU-MST-KEY
+    IF RNU-MST-STATUS = "00"
+        MOVE RNU-J-NO   TO W-NUM
+    ELSE
+        IF RNU-MST-STATUS = "23" THEN
+                         MOVE 1  TO W-NUM RNU-J-NO
+                 ELSE
+                         GO TO F-READ-RNUJ-RTN
+                 END-IF
+    END-IF
+    ADD 1 TO RNU-J-NO
+    WRITE WRITE RNU-MST-REC
+    IF RNU-MST-STATUS NOT = "00"
+        REWRITE RNU-MST-REC
+    END-IF
+    UNLOCK RNU-MST
+
+PARAGRAPH: F-READ-RNUJ-EXIT
+    EXIT
+
+PARAGRAPH: F-BEFORE-RTN
+    MOVE PAT-MST-REC TO W-TMP-PAT-MST-REC
+    MOVE IPD-MST-REC TO W-TMP-IPD-MST-REC
+    MOVE BED-MST-REC TO W-TMP-BED-MST-REC
+
+PARAGRAPH: F-AFTER-RTN
+    INITIALIZE PAT-MST-REC
+    MOVE W-TMP-PAT-MST-REC TO PAT-MST-REC
+    READ PAT-MST KEY IS PAT-MST-KEY
+    INITIALIZE W-PTDECF-LNK
+    MOVE 'O' TO W-PTDECF-IO-SW
+    MOVE 'Y' TO W-PTDECF-IO-HHPAT-YN
+    MOVE PAT-NO TO W-PTDECF-PAT-NO
+    MOVE 'HRRCB1IF' TO W-PTDECF-PROG-ID
+    MOVE 'F-AFTER-RTN' TO W-PTDECF-PROG-PARA
+    MOVE W-TOP-TITLE TO W-PTDECF-PROG-NM
+    MOVE W-RUN-USID TO W-PTDECF-UPD-UID
+    MOVE PAT-MST-REC TO W-PTDECF-PAT-MST-REC
+    CALL HHPTDECF USING W-PTDECF-LNK
+    EVALUATE W-PTDECF-IO-YN
+        WHEN 'Y'
+            MOVE W-PTDECF-PAT-MST-REC TO PAT-MST-REC
+        WHEN 'N'
+            DISPLAY MESSAGE "病歷號: " PAT-NO "病歷檔加解密失敗!!"
+         END-EVALUATE.
+    END-EVALUATE
+    MOVE W-TMP-PAT-MST-REC TO PAT-MST-REC
+    INITIALIZE IPD-MST-REC
+    MOVE W-TMP-IPD-MST-REC TO IPD-MST-REC
+    READ IPD-MST KEY IS IPD-MST-KEY
+    MOVE W-TMP-IPD-MST-REC TO IPD-MST-REC
+    INITIALIZE BED-MST-REC
+    MOVE W-TMP-BED-MST-REC TO BED-MST-REC
+    READ BED-MST KEY IS BED-MST-KEY
+    MOVE W-TMP-BED-MST-REC TO BED-MST-REC
+
+PARAGRAPH: F-DEL-ANN-MST
+    PERFORM F-READ-ANN-MST
+    IF HXANN-MST-STATUS NOT = "00"
+        EXIT    PARAGRAPH
+    END-IF
+    MOVE "E" TO HXANN-TRN-SW
+    MOVE ICA-UPD-DATE TO HXANN-DEL-DATE
+    MOVE ICA-UPD-TIME TO HXANN-DEL-TIME(01:04)
+    MOVE ICA-UPD-USR-ID TO HXANN-DEL-MAN
+    MOVE "A" TO HXANN-DEL-SW
+    REWRITE REWRITE         HXANN-REC
+
+PARAGRAPH: F-READ-ANN-MST
+    INITIALIZE HXANN-REC
+    MOVE ICA-ODR-NO TO HXANN-OD-NO
+    MOVE ICA-IPD-NO TO HXANN-PD-NO
+    MOVE ECB-FILE-NO TO HXANN-IP-SEQ
+    READ HXANN-MST KEY IS HXANN-KEY
+
+PARAGRAPH: F-OPEN-RTN
+    PERFORM F-OPEN-MESG
+    PERFORM F-WIN-CLOCK
+    INITIALIZE W-LA-NAME
+    MOVE "NID-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT NID-MST
+    INITIALIZE W-LA-NAME
+    MOVE "PAT-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT PAT-MST
+    INITIALIZE W-LA-NAME
+    MOVE "IPD-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O IPD-MST
+    IF IPD-MST-STATUS = "35"
+        OPEN    OUTPUT IPD-MST
+        CLOSE   IPD-MST
+        OPEN    I-O IPD-MST
+    END-IF
+    INITIALIZE IPD-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "IPX-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT IPX-MST
+    INITIALIZE W-LA-NAME
+    MOVE "ICA-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-OICA-RTN THRU F-OICA-EXIT
+    INITIALIZE W-LA-NAME
+    MOVE "ICB-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-OICB-RTN THRU F-OICB-EXIT
+    INITIALIZE W-LA-NAME
+    MOVE "HIGCA-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HIGCA-MST
+    IF HIGCA-MST-STATUS = "35"
+        OPEN    OUTPUT HIGCA-MST
+        CLOSE   HIGCA-MST
+        OPEN    I-O HIGCA-MST
+    END-IF
+    INITIALIZE W-LA-NAME
+    MOVE "HIGCB-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HIGCB-MST
+    IF HIGCB-MST-STATUS = "35"
+        OPEN    OUTPUT HIGCB-MST
+        CLOSE   HIGCB-MST
+        OPEN    I-O HIGCB-MST
+    END-IF
+    INITIALIZE W-LA-NAME
+    MOVE "FON-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT FON-MST
+    INITIALIZE W-LA-NAME
+    MOVE "BED-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT BED-MST
+    INITIALIZE W-LA-NAME
+    MOVE "DTE-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT DTE-MST
+    INITIALIZE W-LA-NAME
+    MOVE "PRS-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT PRS-MST
+    INITIALIZE W-LA-NAME
+    MOVE "PEF-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT PEF-MST
+    INITIALIZE W-LA-NAME
+    MOVE "ECB-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O ECB-MST
+    IF ECB-MST-STATUS = "35"
+        OPEN    OUTPUT ECB-MST
+        CLOSE   ECB-MST
+        OPEN    I-O ECB-MST
+    END-IF
+    INITIALIZE ECB-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "ELC-TRN 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O ELC-TRN
+    IF ELC-TRN-STATUS = "35"
+        OPEN    OUTPUT ELC-TRN
+        CLOSE   ELC-TRN
+        OPEN    I-O ELC-TRN
+    END-IF
+    INITIALIZE ELC-TRN-REC
+    INITIALIZE W-LA-NAME
+    MOVE "IBG-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O IBG-MST
+    IF IBG-MST-STATUS = "35"
+        OPEN    OUTPUT IBG-MST
+        CLOSE   IBG-MST
+        OPEN    I-O IBG-MST
+    END-IF
+    INITIALIZE IBG-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "RNU-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O RNU-MST
+    IF RNU-MST-STATUS = "35"
+        OPEN    OUTPUT RNU-MST
+        CLOSE   RNU-MST
+        OPEN    I-O RNU-MST
+    END-IF
+    INITIALIZE RNU-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "FNS-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O FNS-MST
+    IF FNS-MST-STATUS = "35"
+        OPEN    OUTPUT FNS-MST
+        CLOSE   FNS-MST
+        OPEN    I-O FNS-MST
+    END-IF
+    INITIALIZE FNS-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "HRDTA-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O HRDTA-MST
+    IF HRDTA-MST-STATUS = "35"
+        OPEN    OUTPUT HRDTA-MST
+        CLOSE   HRDTA-MST
+        OPEN    I-O HRDTA-MST
+    END-IF
+    INITIALIZE HRDTA-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "HRDTB-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    OPEN I-O HRDTB-MST
+    IF HRDTB-MST-STATUS = "35"
+        OPEN    OUTPUT HRDTB-MST
+        CLOSE   HRDTB-MST
+        OPEN    I-O HRDTB-MST
+    END-IF
+    INITIALIZE HRDTB-MST-REC
+    INITIALIZE W-LA-NAME
+    MOVE "HTSYS-SON 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTSYS-SON
+    INITIALIZE W-LA-NAME
+    MOVE "HTDPT-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTDPT-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTCHK-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTCHK-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTRPT-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTRPT-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTCLS-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTCLS-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTCTM-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTCTM-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTCTR-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTCTR-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTITM-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTITM-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTREF-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTREF-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTSPL-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT HTSPL-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTBTL-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT HTBTL-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTWRK-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT HTWRK-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HTCSP-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HTCSP-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXSRM-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT HXSRM-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXSCT-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT HXSCT-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXSCD-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HXSCD-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXSCC-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HXSCC-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXSCM-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HXSCM-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXSCH-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HXSCH-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HXANN-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HXANN-MST
+    INITIALIZE W-LA-NAME
+    MOVE "ENB-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O ENB-MST
+    INITIALIZE W-LA-NAME
+    MOVE "IKEY-TMP 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O IKEY-TMP
+    INITIALIZE W-LA-NAME
+    MOVE "ICC-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O ICC-MST
+    INITIALIZE W-LA-NAME
+    MOVE "ENA-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O ENA-MST
+    INITIALIZE W-LA-NAME
+    MOVE "ENC-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O ENC-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HIEND-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HIEND-MST
+    INITIALIZE W-LA-NAME
+    MOVE "RTA-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O RTA-MST
+    INITIALIZE W-LA-NAME
+    MOVE "RTB-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O RTB-MST
+    INITIALIZE W-LA-NAME
+    MOVE "HRUDL3-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN I-O HRUDL3-MST
+    PERFORM F-CLOCK
+    PERFORM F-DEP-RTN
+    PERFORM F-DR-RTN
+    PERFORM F-NID-1000
+    PERFORM F-NID-1099
+    MOVE W-NID-1099(111:1) TO W-CHK-1029-YN
+    PERFORM F-NID-1198
+    PERFORM F-NID-1799
+    PERFORM F-CLOSE-WIN-CLOCK
+
+PARAGRAPH: F-OPEN-EXIT
+    EXIT
+
+PARAGRAPH: F-HT-OPEN
+    PERFORM F-OPEN-MESG
+    PERFORM F-WIN-CLOCK
+    INITIALIZE W-LA-NAME
+    MOVE "HMSID-MST 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    PERFORM F-CLOCK
+    OPEN INPUT HMSID-MST
+    MOVE 'TV' TO HMSID-SYS-CODE
+    READ HMSID-MST INTO HMSID-REC KEY IS HMSID-KEY
+    IF W-FS-HMSID = "00"
+        MOVE HMSID-REC TO W-SID-REC
+    END-IF
+    CLOSE CLOSE HMSID-MST
+    IF W-SID-HT-LINK = 'Y'
+        OPEN I-O HTV03-MST
+        OPEN I-O HTV02-MST
+        OPEN I-O HTV05-MST
+        OPEN I-O HTVNO-MST
+        OPEN I-O HTVVV-MST
+        OPEN I-O HTVK1-MST
+        OPEN I-O HTVK2-MST
+        OPEN I-O HTVK3-MST
+        OPEN I-O HTVK4-MST
+        INITIALIZE HTVVV-REC W-VVV-REC
+        MOVE 'TV' TO HTVVV-DPT-CD
+        READ HTVVV-MST INTO HTVVV-REC KEY IS HTVVV-KEY
+        IF W-FS-HTVVV = "00" THEN
+                         MOVE HTVVV-REC     TO W-VVV-REC
+                 END-IF
+    ELSE
+        OPEN I-O HTVHK-MST
+        OPEN I-O HTVHR-MST
+        OPEN I-O HTVH1-MST
+        OPEN I-O HTVPL-MST
+        OPEN I-O HTANT-MST
+        OPEN I-O HTATE-MST
+        OPEN I-O HTATC-MST
+        OPEN I-O HTVIR-MST
+        OPEN I-O HTMIC-MST
+        OPEN I-O HTDDM-MST
+        OPEN I-O HTVRT-MST
+        OPEN I-O HTVR1-MST
+    END-IF
+    PERFORM F-CLOSE-WIN-CLOCK
+
+PARAGRAPH: F-CLOSE-RTN
+    PERFORM F-CLOSE-MESG
+    PERFORM F-WIN-CLOCK
+    PERFORM F-BIRD
+    CLOSE CLOSE NID-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE PAT-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE IPD-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE IPX-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ICA-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ICB-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HIGCA-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HIGCB-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE FON-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE BED-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE DTE-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE PRS-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE PEF-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ECB-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ELC-TRN
+    PERFORM F-BIRD
+    CLOSE CLOSE IBG-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE RNU-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE FNS-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HRDTA-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HRDTB-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTSYS-SON
+    PERFORM F-BIRD
+    CLOSE CLOSE HTDPT-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTCHK-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTRPT-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTCLS-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTCTM-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTCTR-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTITM-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTREF-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTSPL-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTBTL-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTWRK-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTCSP-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXSRM-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXSCT-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXSCD-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXSCC-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXSCM-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXSCH-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HXANN-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ENB-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE IKEY-TMP
+    PERFORM F-BIRD
+    CLOSE CLOSE ICC-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ENA-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE ENC-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HIEND-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE RTA-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE RTB-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HRUDL3-MST
+    PERFORM F-CLOSE-WIN-CLOCK
+
+PARAGRAPH: F-CLOSE-EXIT
+    EXIT
+
+PARAGRAPH: F-HT-CLOSE
+    PERFORM F-CLOSE-MESG
+    PERFORM F-WIN-CLOCK
+    IF W-SID-HT-LINK = 'Y'
+        PERFORM F-HT-CLOSE1
+    ELSE
+        PERFORM F-HT-CLOSE2
+    END-IF
+    PERFORM F-CLOSE-WIN-CLOCK
+
+PARAGRAPH: F-HT-CLOSE1
+    PERFORM F-BIRD
+    CLOSE CLOSE HTV03-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTV02-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTV05-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVNO-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVVV-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVK1-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVK2-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVK3-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVK4-MST
+
+PARAGRAPH: F-HT-CLOSE2
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVHK-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVHR-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVH1-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVPL-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTANT-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTATE-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTATC-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVIR-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTMIC-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTDDM-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVRT-MST
+    PERFORM F-BIRD
+    CLOSE CLOSE HTVR1-MST
+
+PARAGRAPH: F-INIT-RTN
+    INITIALIZE W-CHK-EXIT, W-TYPE1, W-TITLE-DATA, W-PAGE
+    INITIALIZE W-KEY-TABLE, W-TMP-ECB-TYPE, W-FORM-TITLE
+    EVALUATE W-SOU
+        WHEN "M"
+            MOVE W-RUN-PARA(1:1)    TO W-TMP-PARA
+            PERFORM F-FORM-TITLE
+        WHEN "S"
+            MOVE W-LNK2             TO W-TMP-PARA
+            PERFORM F-FORM-TITLE
+        WHEN "O"
+            MOVE W-RUN-PARA(1:1)    TO W-TMP-PARA
+            PERFORM F-FORM-TITLE
+    END-EVALUATE
+
+PARAGRAPH: F-INIT-EXIT
+    EXIT
+
+PARAGRAPH: F-FORM-TITLE
+    EVALUATE W-TMP-PARA
+        WHEN "A"
+            MOVE "住院期間用藥查詢"         TO W-FORM-TITLE
+        WHEN "B"
+            MOVE "住院期間檢驗放射線查詢"   TO W-FORM-TITLE
+        WHEN "C"
+            MOVE "住院期間治療處置查詢"     TO W-FORM-TITLE
+    END-EVALUATE
+    DISPLAY DISPLAY S-RCB1-Fr-1.
+
+PARAGRAPH: F-NID-1000
+    INITIALIZE NID-MST-REC
+    MOVE "1000" TO NID-ID
+    MOVE "AV" TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS NOT = "00"
+        INITIALIZE W-NOTE
+        MOVE "住院參數設定檔尚未建檔，請連絡資訊室人員！"       TO W-NOTE
+        PERFORM F-ERR-NOTE
+    ELSE
+        MOVE NID-MST-REC TO W-NID-1000
+    END-IF
+
+PARAGRAPH: F-NID-1099
+    INITIALIZE NID-MST-REC, W-NID-1099
+    MOVE "1099" TO NID-ID
+    MOVE "AV" TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00"
+        MOVE NID-MST-REC TO W-NID-1099
+    END-IF
+
+PARAGRAPH: F-NID-1198
+    INITIALIZE NID-MST-REC, W-NID-1198
+    MOVE "1198" TO NID-ID
+    MOVE "0" TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00"
+        MOVE NID-MST-REC TO W-NID-1198
+    END-IF
+    INITIALIZE NID-MST-REC, W-NID-6101
+    MOVE "6101" TO NID-ID
+    MOVE "0" TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00"
+        MOVE NID-MST-REC TO W-NID-6101
+    END-IF
+
+PARAGRAPH: F-NID-1799
+    INITIALIZE NID-MST-REC, W-1799-REC
+    MOVE "1799" TO NID-ID
+    MOVE "0" TO NID-CODE
+    READ NID-MST KEY IS NID-MST-KEY
+    IF NID-MST-STATUS = "00"
+        MOVE NID-MST-REC TO W-1799-REC
+    END-IF
+
+PARAGRAPH: F-CHK-LOG-RTN
+    INITIALIZE L-PAM-LNK
+    MOVE "I" TO L-PAM-ID
+    MOVE "HRRCB1IF" TO L-PAM-PROG
+    CALL HZPAMCF USING W-RUNL-CHK, L-PAM-LNK
+    IF L-PAM-GO-YN = "N"
+        IF W-SOU = "M" OR "O" THEN
+                         PERFORM F-CLOSE-RTN THRU F-CLOSE-EXIT
+                 END-IF
+        GOBACK
+    END-IF
+
+PARAGRAPH: F-CHK-LOG-EXIT
+    EXIT
+
+PARAGRAPH: F-CATCH-SEL-RTN
+    IF L-PAM-LOG-YN    = "Y"
+        INITIALIZE L-HZRCDCF-LNK
+        MOVE    "I"                     TO L-RCD-ID
+        MOVE    W-RUN-USID              TO L-RCD-USER
+        MOVE    L-PAM-SYS               TO L-RCD-SYS
+        MOVE    L-PAM-PROG              TO L-RCD-PROG
+        MOVE    W-PAT-NO                TO L-RCD-PAT-NO
+        MOVE    "2"                     TO L-RCD-REC-WAY
+        MOVE    "醫令開立管理作業-住院期間用藥明細查詢" TO L-RCD-MEMO
+        MOVE    L-PAM-ARCH-YN           TO L-RCD-ARCH-YN
+        MOVE    L-PAM-LOGSG-SW-I        TO L-RCD-LOGSG-SW-I
+        CALL "HZRCDCF"  USING W-RUNL-CHK, L-HZRCDCF-LNK ON    EXCEPTION CONTINUE
+                 END-CALL
+    END-IF
+
+PARAGRAPH: F-PACK-RTN
+    IF L-PAM-LOG-YN    = "Y"
+        INITIALIZE L-HZRCDCF-LNK
+        MOVE "I"                        TO L-RCD-ID
+        MOVE    L-PAM-SYS               TO L-RCD-SYS
+        MOVE    L-PAM-PROG              TO L-RCD-PROG
+        MOVE W-PAT-NO                   TO L-RCD-PAT-NO
+        MOVE "2"                        TO L-RCD-REC-WAY
+        MOVE W-RUN-USID                 TO L-RCD-USER
+        MOVE "C"                        TO L-RCD-OPEN-YN
+        MOVE    "醫令開立管理作業-住院期間用藥明細查詢" TO L-RCD-MEMO
+        MOVE    L-PAM-ARCH-YN           TO L-RCD-ARCH-YN
+        MOVE    L-PAM-LOGSG-SW-I        TO L-RCD-LOGSG-SW-I
+        CALL "HZRCDCF"  USING W-RUNL-CHK, L-HZRCDCF-LNK ON EXCEPTION CONTINUE
+                 END-CALL
+    END-IF
+
+PARAGRAPH: F-MOVE-WK-NAME-RTN
+    MOVE "呼叫失敗" TO W-HR-ODRW-WK-NAME
+
+PARAGRAPH: F-MOVE-WK-NAME-EXIT
+    EXIT
+
+PARAGRAPH: F-EXIT-RTN
+    INITIALIZE W-HRMESCF-DATA, W-HRMESCF-DATA2
+    MOVE "2" TO W-HRMESCF-PIC-TYPE
+    MOVE "4" TO W-HRMESCF-BUT-TYPE
+    MOVE "Y" TO W-HRMESCF-CONTROL-ID
+    MOVE "是否確定離開??" TO W-HRMESCF-NOTE(1)
+    CALL HRMESCF USING W-HRMESCF-DATA, W-HRMESCF-DATA2
+    IF W-HRMESCF-RETURN = "Y"
+        MOVE 27 TO KEY-STATUS
+    ELSE
+        INITIALIZE KEY-STATUS
+    END-IF
+
+PARAGRAPH: F-START-HRDTB-RTN
+    START START HRDTB-MST KEY IS NOT < HRDTB-MST-KEY
+    IF HRDTB-MST-STATUS = "00"
+        READ HRDTB-MST NEXT RECORD
+    END-IF
+    IF HRDTB-MST-STATUS NOT = "00" OR
+            HRDTB-IPD-NO NOT = IPD-NO
+        MOVE "10"       TO HRDTB-MST-STATUS
+    END-IF
+    IF W-FS = 10 AND HRDTB-MST-STATUS = "10"
+        CONTINUE
+    ELSE
+        MOVE 0  TO W-FS
+    END-IF
+
+PARAGRAPH: F-START-HRDTB-EXIT
+    EXIT
+
+PARAGRAPH: F-READ-TEST-RTN
+    PERFORM F-CHK-FORM-RTN
+    INITIALIZE W-DIS-TABLE
+    MOVE 2 TO W-II
+    IF HRDTB-IPD-NO = IPD-NO
+        PERFORM F-READ-HRDTB-RTN THRU F-READ-HRDTB-EXIT
+    END-IF
+    IF W-II <= W-MENU-ITEMS
+        PERFORM F-READ-HIECB-RTN THRU F-READ-HIECB-EXIT
+    END-IF
+
+PARAGRAPH: F-READ-TEST-EXIT
+    EXIT
+
+PARAGRAPH: F-READ-HRDTB-RTN
+    PERFORM UNTIL HRDTB-MST-STATUSNOT="00"ORHRDTB-IPD-NONOT=IPD-NOORW-II>W-MENU-ITEMS
+        PERFORM F-MOVE-GRID-RTN THRU F-MOVE-GRID-EXIT
+        ADD 1   TO W-II
+        READ HRDTB-MST NEXT RECORD
+    END-PERFORM
+
+PARAGRAPH: F-READ-HRDTB-EXIT
+    EXIT
+
+PARAGRAPH: F-READ-HIECB-RTN
+    MOVE ECB-MST-REC TO W-PICB, W-KEY1(W-PAGE)
+    PERFORM UNTIL ECB-MST-STATUSNOT="00"ORW-II>W-MENU-ITEMSORW-FS=10
+        PERFORM F-LOAD-GRID-RTN
+        PERFORM F-READN-RTN
+        ADD 1   TO W-II
+    END-PERFORM
+    MODIFY S-RCB1-GD-1,START-X = 1,X = 99,START-Y = 2 ,Y = 2,REGION-COLOR = W-GD-COLOR
+    MOVE 2 TO W-GRID-Y, W-GRID-Y1
+
+PARAGRAPH: F-READ-HIECB-EXIT
+    EXIT
+
+PARAGRAPH: F-MOVE-GRID-RTN
+    INITIALIZE W-GD-REC
+    MOVE W-NO TO W-INQ-SEQ
+    INITIALIZE PRS-MST-REC
+    MOVE HRDTB-FEE-KEY TO PRS-MST-ID
+    READ PRS-MST KEY IS PRS-MST-KEY
+    IF PRS-MST-STATUS = "00"
+        MOVE PRS-ID-NAME        TO W-INQ-PRS-NAME
+    ELSE
+        MOVE "代碼已不存在"     TO W-INQ-PRS-NAME
+    END-IF
+    IF W-NID-6101(80:1) = "Y"
+        INITIALIZE HTITM-REC
+        MOVE HRDTB-DPT-CD       TO HTITM-DPT-CD
+        MOVE HRDTB-CLS-CD       TO HTITM-CLS-CD
+        MOVE HRDTB-ICB-ITM-CD   TO HTITM-ITM-CD
+        READ HTITM-MST KEY IS HTITM-KEY
+        IF HTITM-MST-STATUS = "00" AND HRDTB-DPT-CD = HTITM-DPT-CD AND
+                    HRDTB-CLS-CD = HTITM-CLS-CD AND HRDTB-ICB-ITM-CD = HTITM-ITM-CD THEN
+                         MOVE HTITM-ITM-NM TO W-INQ-PRS-NAME
+                 END-IF
+    END-IF
+    MOVE "取消" TO W-INQ-RX-WAY(1:8)
+    IF HRDTB-RX-QTY1 > 0 AND HRDTB-RX-QTY2 > 0
+        MOVE HRDTB-RX-QTY1      TO W-QTY1
+        MOVE HRDTB-RX-QTY2      TO W-QTY2
+        PERFORM F-QTY-RTN
+        MOVE W-DIS-QTY          TO W-INQ-RX-QTY
+    ELSE
+        MOVE HRDTB-RX-QTY1      TO W-INQ-RX-QTY(1:4)
+        MOVE HRDTB-RX-QTY2      TO W-INQ-RX-QTY(6:2)
+    END-IF
+    INITIALIZE ICA-MST-REC
+    MOVE HRDTB-IPD-NO TO ICA-IPD-NO
+    MOVE HRDTB-ICA-ODR-NO TO ICA-ODR-NO
+    READ ICA-MST KEY IS ICA-KEY
+    IF ICA-MST-STATUS = "00"
+        MOVE ICA-INS-DATE       TO W-INQ-INS-DATE(1:7)
+        MOVE "-"                TO W-INQ-INS-DATE(8:1)
+        IF ICA-ODR-TIME IS NUMERIC      THEN
+                         MOVE ICA-ODR-TIME       TO W-INQ-INS-DATE(9:4)
+                 END-IF
+    ELSE
+        MOVE HRDTB-IP-DATE      TO W-INQ-INS-DATE(1:7)
+        MOVE "-"                TO W-INQ-INS-DATE(8:1)
+        MOVE "0000"             TO W-INQ-INS-DATE(9:4)
+    END-IF
+    INITIALIZE HRDTA-MST-REC
+    MOVE HRDTB-KEY TO HRDTA-KEY
+    READ HRDTA-MST KEY IS HRDTA-MST-KEY
+    IF HRDTA-MST-STATUS = "00"
+        MOVE HRDTA-INS-DATE             TO W-INQ-CANCEL-DTTI(1:7)
+        MOVE "-"                        TO W-INQ-CANCEL-DTTI(8:1)
+        MOVE HRDTA-CRE-TIME(1:4)        TO W-INQ-CANCEL-DTTI(9:4)
+    ELSE
+        MOVE HRDTB-INS-DATE             TO W-INQ-CANCEL-DTTI(1:7)
+        MOVE "-"                        TO W-INQ-CANCEL-DTTI(8:1)
+        MOVE "0000"                     TO W-INQ-CANCEL-DTTI(9:4)
+    END-IF
+    MODIFY S-RCB1-Gd-1, X = 1 , Y = W-II, RECORD-TO-ADD = W-GD-REC
+    MOVE W-GD-REC TO W-DISR(W-II)
+    MOVE HRDTB-MST-REC TO W-HRDTB-REC(W-II)
+    ADD 1           TO W-NO
+
+PARAGRAPH: F-MOVE-GRID-EXIT
+    EXIT
+
+PARAGRAPH: F-DEL-TO-WRITE-HRUDL3-RTN
+    INITIALIZE HRUDL3-MST-REC
+    MOVE W-RUN-YYSW TO W-YMD-YYSW
+    MOVE W-RUN-YYDEF TO W-YMD-YYDEF
+    MOVE W-RUN-YYCOM TO W-YMD-YYCOM
+    ACCEPT W-YMD-DATE FROM ENVIRONMENT CENTURY-DATE
+    MOVE W-YMD-YY TO W-YMD-YYB
+    MOVE W-YMD-YY TO W-YMD-YY1
+    MOVE W-YMD-MM TO W-YMD-MM1
+    MOVE W-YMD-DD TO W-YMD-DD1
+    IF W-YMD-YYCOM NOT = "+" AND "-"
+        ACCEPT W-YMD-YYSW       FROM ENVIRONMENT "ZS_SYYW"
+                 END-ACCEPT
+        ACCEPT W-YMD-YDFSW      FROM ENVIRONMENT "ZS_SYDF"
+                 END-ACCEPT
+        ACCEPT W-YMD-YYCOM      FROM ENVIRONMENT "ZS_SYCM"
+                 END-ACCEPT
+        IF W-YMD-YYSW NOT = "2" AND "4" THEN
+                         MOVE "0" TO W-YMD-YYSW
+                 END-IF
+        IF W-YMD-YYCOM NOT = "+" AND "-" THEN
+                         MOVE "-" TO W-YMD-YYCOM
+                 END-IF
+        MOVE W-YMD-YDFSW TO W-YMD-YYDEF
+        IF ( W-YMD-YYDEF = 0 ) AND
+                    ( W-YMD-YYSW  = "0" ) AND
+                    ( W-YMD-YYCOM = "-" ) THEN
+                         MOVE 1911 TO W-YMD-YYDEF
+                 END-IF
+    END-IF
+    MOVE SPACE TO W-YMD-YYS
+    IF W-YMD-YYSW = "4"
+        CONTINUE
+    ELSE
+        IF W-YMD-YYSW = "2" THEN
+                 MOVE W-YMD-YY1 TO W-YMD-YY
+         ELSE    IF W-YMD-YYCOM = "+" THEN
+                         COMPUTE W-YMD-YY = W-YMD-YY + W-YMD-YYDEF
+                 ELSE    IF W-YMD-YY > W-YMD-YYDEF THEN
+                                 COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF
+                         ELSE    COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF - 1
+                                 MOVE "-" TO W-YMD-YYS
+                         END-IF
+                 END-IF
+         END-IF
+    END-IF
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+    MOVE W-DATE TO HRUDL3-C-DATE, HRUDL3-UPD-DT
+    MOVE W-TIME TO HRUDL3-C-TIME
+    MOVE W-TIME TO HRUDL3-UPD-TIME
+    MOVE PAT-NO TO HRUDL3-PAT-NO
+    MOVE ICB-IPD-NO TO HRUDL3-PATIENT-SEQ
+    MOVE ECB-FEE-SEQ TO HRUDL3-ORDER-SEQ
+    MOVE ECB-FILE-NO TO HRUDL3-FILE-NO
+    MOVE "D" TO HRUDL3-STATUS-FLAG
+    MOVE ICB-FEE-KEY TO HRUDL3-ODR-CODE
+    MOVE ICB-RX-UQTY1 TO HRUDL3-DOSE-MOLE
+    MOVE ICB-RX-UQTY2 TO HRUDL3-DOSE-DENO
+    MOVE ICB-RX-WAY2 TO HRUDL3-METHOD-CODE
+    MOVE ICB-RX-DAYS TO HRUDL3-DAYS
+    MOVE ICB-OP-BDATE TO HRUDL3-B-DATE
+    MOVE ICB-OP-BTIME TO HRUDL3-B-TIME
+    MOVE ICB-OP-EDATE TO HRUDL3-E-DATE
+    MOVE ICB-OP-ETIME TO HRUDL3-E-TIME
+    MOVE ICB-RX-QTY1 TO HRUDL3-NUM-MOLE
+    MOVE ICB-RX-QTY2 TO HRUDL3-NUM-DENO
+    MOVE ICB-PAY-RANK TO HRUDL3-ER-FLAG
+    MOVE ICB-ASU-PAY TO HRUDL3-VAL-SWITCH
+    MOVE ICB-CHG-FLAG TO HRUDL3-OWN-FLAG
+    MOVE ECB-BRAIN-YN TO HRUDL3-BRAIN-FLAG
+    MOVE ECB-LRB-FIELD TO HRUDL3-POSITION-FLAG
+    MOVE ECB-APY-DR TO HRUDL3-DR-CODE
+    MOVE ECB-OPR-DR1 TO HRUDL3-CARRY1-CODE
+    MOVE ECB-OPR-DR2 TO HRUDL3-CARRY2-CODE
+    MOVE ECB-RPT-DR TO HRUDL3-REPORT-DR-CODE
+    MOVE ECB-LNK-POINT-HEAD TO HRUDL3-LNK-POINT-HEAD
+    MOVE ECB-LNK-POINT TO HRUDL3-LNK-POINT
+    MOVE ECB-LNK-TIME TO HRUDL3-LNK-TIME
+    MOVE ICB-PAS-DPT TO HRUDL3-DPT-CODE
+    MOVE ICB-CLS-NO TO HRUDL3-CLS-CODE
+    MOVE ICB-FEE-SEQ TO HRUDL3-SERIAL-NO
+    MOVE ICB-PAS-ITM TO HRUDL3-ITM-CODE
+    MOVE ICB-STD-FNO TO HRUDL3-STD-CODE
+    MOVE ICB-STO-DEPT TO HRUDL3-STORE-CODE
+    MOVE ECB-REMARK TO HRUDL3-ODR-NOTE
+    WRITE WRITE HRUDL3-MST-REC
+    IF HRUDL3-MST-STATUS NOT = "00"
+        MOVE "B"        TO W-TMP-ID
+        MOVE "W"        TO W-UPD-MRK
+        PERFORM F-WRT-LOG2-RTN THRU F-WRT-LOG2-EXIT
+    END-IF
+
+PARAGRAPH: F-WRT-LOG2-RTN
+    MOVE W-RUN-YYSW TO W-YMD-YYSW
+    MOVE W-RUN-YYDEF TO W-YMD-YYDEF
+    MOVE W-RUN-YYCOM TO W-YMD-YYCOM
+    ACCEPT W-YMD-DATE FROM ENVIRONMENT CENTURY-DATE
+    MOVE W-YMD-YY TO W-YMD-YYB
+    MOVE W-YMD-YY TO W-YMD-YY1
+    MOVE W-YMD-MM TO W-YMD-MM1
+    MOVE W-YMD-DD TO W-YMD-DD1
+    IF W-YMD-YYCOM NOT = "+" AND "-"
+        ACCEPT W-YMD-YYSW       FROM ENVIRONMENT "ZS_SYYW"
+                 END-ACCEPT
+        ACCEPT W-YMD-YDFSW      FROM ENVIRONMENT "ZS_SYDF"
+                 END-ACCEPT
+        ACCEPT W-YMD-YYCOM      FROM ENVIRONMENT "ZS_SYCM"
+                 END-ACCEPT
+        IF W-YMD-YYSW NOT = "2" AND "4" THEN
+                         MOVE "0" TO W-YMD-YYSW
+                 END-IF
+        IF W-YMD-YYCOM NOT = "+" AND "-" THEN
+                         MOVE "-" TO W-YMD-YYCOM
+                 END-IF
+        MOVE W-YMD-YDFSW TO W-YMD-YYDEF
+        IF ( W-YMD-YYDEF = 0 ) AND
+                    ( W-YMD-YYSW  = "0" ) AND
+                    ( W-YMD-YYCOM = "-" ) THEN
+                         MOVE 1911 TO W-YMD-YYDEF
+                 END-IF
+    END-IF
+    MOVE SPACE TO W-YMD-YYS
+    IF W-YMD-YYSW = "4"
+        CONTINUE
+    ELSE
+        IF W-YMD-YYSW = "2" THEN
+                 MOVE W-YMD-YY1 TO W-YMD-YY
+         ELSE    IF W-YMD-YYCOM = "+" THEN
+                         COMPUTE W-YMD-YY = W-YMD-YY + W-YMD-YYDEF
+                 ELSE    IF W-YMD-YY > W-YMD-YYDEF THEN
+                                 COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF
+                         ELSE    COMPUTE W-YMD-YY = W-YMD-YY - W-YMD-YYDEF - 1
+                                 MOVE "-" TO W-YMD-YYS
+                         END-IF
+                 END-IF
+         END-IF
+    END-IF
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+    ACCEPT W-YMD-TIME8
+    MOVE W-YMD-HHS TO W-YMD-HH
+    MOVE W-YMD-MTS TO W-YMD-MT
+    MOVE W-YMD-SSS TO W-YMD-SS
+    MOVE W-YMD-DATE TO W-DATE
+    MOVE W-YMD-TIME TO W-TIME
+    INITIALIZE LOG2-MST-REC, W-DEC-TIME, W-LOG2-ODR-TIME
+    ADD 1 TO W-LOG2-CON
+    MOVE "7" TO LOG2-ID
+    MOVE W-DATE TO LOG2-CRE-DT
+    MOVE W-TIME TO LOG2-CRE-TI, W-LOG2-ODR-TIME
+    COMPUTE COMPUTE LOG2-DCRE-DT = 9999999 - LOG2-CRE-DT
+    COMPUTE COMPUTE W-DEC-TIME = 999999 - W-LOG2-ODR-TIME
+    MOVE W-DEC-TIME TO LOG2-DCRE-TI
+    MOVE W-LOG2-CON TO LOG2-ID-SEQ, LOG2-FEE-NO
+    MOVE W-UPD-MRK TO LOG2-UPD-MRK
+    IF W-TMP-ID = "A"
+        STRING  "處方-" ICA-KEY " 寫檔不成功，狀況：" ICA-MST-STATUS " ！"
+                         " 日期-" W-DATE " 時間-" W-TIME  DELIMITED BY SIZE INTO LOG2-DATA
+                 END-STRING
+    ELSE
+        STRING  "住院醫令[檢驗檢查放射]異動記錄檔寫檔不成功，狀況：" HRUDL3-MST-STATUS " ！"
+                         " 日期-" W-DATE " 時間-" W-TIME  DELIMITED BY SIZE INTO LOG2-DATA
+                 END-STRING
+    END-IF
+    WRITE WRITE LOG2-MST-REC
+
+PARAGRAPH: F-WRT-LOG2-EXIT
+    EXIT
+
+PARAGRAPH: F-CHK-LOCK-RTN
+    INITIALIZE W-LNK-LOCKCF
+    IF W-CHK-1029-YN = "Y"
+        MOVE    "02"    TO      W-LOCKCF-ID
+    ELSE
+        MOVE    "03"    TO      W-LOCKCF-ID
+    END-IF
+    MOVE W-CHK-DTE-YMD TO W-LOCKCF-DT
+    CALL HILOCKCF USING W-LNK-LOCKCF
+
+PARAGRAPH: F-CHK-LOCK-EXIT
+    EXIT
+
+PARAGRAPH: F-READ-ELC-SETTING
+    INITIALIZE W-LNK-ELCCF
+    MOVE "01" TO W-ELCCF-ID
+    CALL HIELCCF USING W-LNK-ELCCF
+    MOVE W-ELCCF-YN TO W-ELC-YN
+    MOVE W-ELCCF-APY-YN TO W-USE-APY-YN
+
+PARAGRAPH: F-OPEN-ELC-TRN
+    INITIALIZE W-LNK-ELCCF
+    IF (W-ELC-YN       NOT = "Y")
+         AND     (W-USE-APY-YN   NOT = "Y")
+        EXIT    PARAGRAPH
+    END-IF
+    MOVE "02" TO W-ELCCF-ID
+    CALL HIELCCF USING W-LNK-ELCCF
+
+PARAGRAPH: F-CLOSE-ELC-TRN
+    INITIALIZE W-LNK-ELCCF
+    IF (W-ELC-YN       NOT = "Y")
+         AND     (W-USE-APY-YN   NOT = "Y")
+        EXIT    PARAGRAPH
+    END-IF
+    MOVE "03" TO W-ELCCF-ID
+    CALL HIELCCF USING W-LNK-ELCCF
+
+PARAGRAPH: F-WRITE-ELC-TRN-11
+    IF W-ELC-YN        NOT = "Y"
+        EXIT    PARAGRAPH
+    END-IF
+    INITIALIZE W-LNK-ELCCF
+    MOVE "11" TO W-ELCCF-ID
+    MOVE IPD-NO TO W-ELCCF-IPD-NO
+    MOVE W-ELC-MARK TO W-ELCCF-MARK
+    CALL HIELCCF USING W-LNK-ELCCF
+
+PARAGRAPH: F-WRITE-ELC-TRN-21
+    PERFORM F-WRITE-ELC-TRN-211
+    PERFORM F-WRITE-ELC-TRN-41
+
+PARAGRAPH: F-WRITE-ELC-TRN-211
+    IF W-ELC-YN        NOT = "Y"
+        EXIT    PARAGRAPH
+    END-IF
+    INITIALIZE W-LNK-ELCCF
+    MOVE "21" TO W-ELCCF-ID
+    MOVE ICA-IPD-NO TO W-ELCCF-IPD-NO
+    MOVE ICA-ODR-NO TO W-ELCCF-ODR-NO
+    MOVE W-ELC-MARK TO W-ELCCF-MARK
+    CALL HIELCCF USING W-LNK-ELCCF
+
+PARAGRAPH: F-WRITE-ELC-TRN-41
+    IF W-USE-APY-YN            NOT = "Y"
+        EXIT    PARAGRAPH
+    END-IF
+    INITIALIZE W-LNK-ELCCF
+    MOVE "41" TO W-ELCCF-ID
+    MOVE ICA-IPD-NO TO W-ELCCF-IPD-NO
+    MOVE ICA-ODR-NO TO W-ELCCF-ODR-NO
+    MOVE W-ELC-MARK TO W-ELCCF-MARK
+    CALL HIELCCF USING W-LNK-ELCCF
+
+PARAGRAPH: F-WRITE-GCA-OLD-RTN
+    INITIALIZE HIGCA-MST-REC
+    MOVE W-ICA-TMP-KEY TO HIGCA-KEY
+    MOVE W-DATE TO HIGCA-DATE
+    MOVE W-TIME TO HIGCA-TIME
+    MOVE W-UPD-ID TO HIGCA-UPD-ID
+    MOVE W-ICA-TMP-UPD-USR-ID TO HIGCA-UPD-USR
+    MOVE W-GCA-APY-ID TO HIGCA-APY-ID
+    MOVE W-ICA-TMP-GROUP-DATA1 TO HIGCA-DATA1
+    WRITE WRITE   HIGCA-MST-REC
+
+PARAGRAPH: F-WRITE-GCA-OLD-EXIT
+    EXIT
+
+PARAGRAPH: F-WRITE-GCA-NEW-RTN
+    INITIALIZE HIGCA-MST-REC
+    MOVE ICA-IPD-NO TO HIGCA-IPD-NO
+    MOVE ICA-ODR-NO TO HIGCA-ODR-NO
+    MOVE W-DATE TO HIGCA-DATE
+    MOVE W-TIME TO HIGCA-TIME
+    MOVE W-UPD-ID TO HIGCA-UPD-ID
+    MOVE W-RK-DUTY-ID1 TO HIGCA-UPD-USR
+    MOVE W-GCA-APY-ID TO HIGCA-APY-ID
+    MOVE ICA-GROUP-DATA1 TO HIGCA-DATA1
+    WRITE WRITE   HIGCA-MST-REC
+
+PARAGRAPH: F-WRITE-GCA-NEW-EXIT
+    EXIT
+
+PARAGRAPH: F-WRITE-GCB-RTN
+    INITIALIZE HIGCB-MST-REC
+    MOVE ICB-IPD-NO TO HIGCB-IPD-NO
+    MOVE ICB-ODR-NO TO HIGCB-ODR-NO
+    MOVE W-DATE TO HIGCB-DATE
+    MOVE W-TIME TO HIGCB-TIME
+    MOVE ICB-FEE-SEQ TO HIGCB-FEE-SEQ
+    MOVE ICB-FEE-KEY TO HIGCB-FEE-KEY
+    MOVE W-UPD-ID TO HIGCB-UPD-ID
+    MOVE ICB-GROUP-DATA1 TO HIGCB-DATA1
+    MOVE ECB-FILE-NO TO HIGCB-FILE-NO
+    MOVE ECB-TYPE TO HIGCB-TYPE
+    MOVE ECB-ALT1 TO HIGCB-ECB-ALT1
+    MOVE ECB-ALT2 TO HIGCB-ECB-ALT2
+    MOVE ECB-GROUP-DATA1 TO HIGCB-ECB-DATA1
+    MOVE ECB-GROUP-DATA2 TO HIGCB-ECB-DATA2
+    WRITE WRITE   HIGCB-MST-REC
+
+PARAGRAPH: F-WRITE-GCB-EXIT
+    EXIT
+
+PARAGRAPH: F-ADD-MT-RTN
+    ADD     1       TO      W-MT
+
+PARAGRAPH: F-ADD-MT-EXIT
+    EXIT
+
+PARAGRAPH: F-SEARCH-DPT-RTN
+    IF HR-TMP-DPT NOT = SPACE
+        MOVE 1 TO HR-DPT-JJ
+        SEARCH W-DEP-TAB1 VARYING HR-DPT-JJ
+    ELSE
+        INITIALIZE HR-TMP-DPT-NAME
+    END-IF
+    IF HR-TMP-DPT-NAME = SPACE
+        INITIALIZE NID-MST-REC
+        MOVE "0501"     TO NID-ID
+        MOVE HR-TMP-DPT TO NID-CODE
+        READ NID-MST KEY IS NID-MST-KEY
+        IF NID-MST-STATUS = "00" THEN
+                         MOVE NID-NAME   TO HR-TMP-DPT-NAME
+                 ELSE
+                         MOVE HR-TMP-DPT TO HR-TMP-DPT-NAME
+
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-SEARCH-DR-RTN
+    IF HR-TMP-DR NOT = SPACE
+        MOVE 1 TO HR-DR-JJ
+        SEARCH W-DR-TAB1 VARYING HR-DR-JJ
+    ELSE
+        INITIALIZE HR-TMP-DR-NAME
+    END-IF
+    IF HR-TMP-DR-NAME = SPACE
+        INITIALIZE NID-MST-REC
+        MOVE "0503"     TO NID-ID
+        MOVE HR-TMP-DR  TO NID-CODE
+        READ NID-MST KEY IS NID-MST-KEY
+        IF NID-MST-STATUS = "00" THEN
+                         MOVE NID-NAME   TO HR-TMP-DR-NAME
+                 ELSE
+                         MOVE HR-TMP-DR  TO HR-TMP-DR-NAME
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-DEP-RTN
+    INITIALIZE W-LA-NAME
+    MOVE "系統科別代碼下載中,請稍候 ..." TO W-LA-NAME
+    INITIALIZE NID-MST-REC
+    MOVE "0501" TO NID-ID
+    START START NID-MST KEY IS NOT < NID-ALT-KEY1
+    READ NID-MST NEXT
+    PERFORM VARYING
+        if nid-mst-rec(300:1) not = "N" then
+                                 IF HR-DPT-II1 <= 999 THEN
+                                         PERFORM F-CLOCK
+                                         MOVE HR-DPT-II1 TO HR-DPT-II
+                                         INITIALIZE W-DEP-TAB1(HR-DPT-II)
+                                         MOVE NID-CODE   TO HR-DEP-TAB1-NO(HR-DPT-II)
+                                         MOVE NID-NAME   TO HR-DEP-TAB1-NAME(HR-DPT-II)
+                                 END-IF
+                         else
+
+                                 COMPUTE HR-DPT-II1 = HR-DPT-II1 - 1
+                         end-if
+        READ NID-MST NEXT RECORD
+        IF NID-ID NOT = "0501"
+                                 MOVE "99" TO NID-MST-STATUS
+                         END-IF
+    END-PERFORM
+
+PARAGRAPH: F-DR-RTN
+    INITIALIZE W-LA-NAME
+    MOVE "系統醫師代碼下載中,請稍候 ..." TO W-LA-NAME
+    INITIALIZE NID-MST-REC
+    MOVE "0503" TO NID-ID
+    START START NID-MST KEY IS NOT < NID-MST-KEY
+    READ NID-MST NEXT
+    PERFORM VARYING
+        PERFORM F-CLOCK
+        IF HR-DR-II1 <= 5000 THEN
+                                 MOVE HR-DR-II1  TO HR-DR-II
+                                 INITIALIZE W-DR-TAB1(HR-DR-II)
+                                 MOVE NID-CODE           TO HR-DR-TAB1-NO(HR-DR-II)
+                                 MOVE NID-NAME           TO HR-DR-TAB1-NAME(HR-DR-II)
+                         END-IF
+        READ NID-MST NEXT RECORD
+        IF NID-ID NOT = "0503"
+                                 MOVE "99" TO NID-MST-STATUS
+                         END-IF
+    END-PERFORM
+
+PARAGRAPH: F-OPEN-MESG
+    INITIALIZE W-LA-NAME
+    MOVE "程 式 開 檔 中.....請 稍 候....." TO W-LA-NAME
+    MOVE "程 式 開 檔 中.....請 稍 候....." TO W-FONT-TITLE
+    INITIALIZE W-PERCENT
+    MOVE "O" TO W-OPEN-MESG-TYPE
+
+PARAGRAPH: F-CLOSE-MESG
+    INITIALIZE W-LA-NAME
+    MOVE "程 式 關 檔 中.....請 稍 候....." TO W-LA-NAME
+    MOVE "程 式 關 檔 中.....請 稍 候....." TO W-FONT-TITLE
+    MOVE 100 TO W-PERCENT
+    MOVE "C" TO W-OPEN-MESG-TYPE
+
+PARAGRAPH: F-WIN-CLOCK
+    CONTINUE
+    DISPLAY DISPLAY S-LOAD-FORM UPON S-LOAD-FORM-Handle.
+
+PARAGRAPH: F-CLOSE-WIN-CLOCK
+    IF W-OPEN-MESG-TYPE = "O" OR SPACE
+        IF W-PERCENT-ADD = 0 THEN
+                         MOVE 99 TO W-PERCENT
+                 ELSE
+                         COMPUTE W-PERCENT = 100 - W-PERCENT-ADD
+                 END-IF
+        PERFORM F-CLOCK
+    ELSE
+        IF W-PERCENT-ADD = 0 THEN
+                         MOVE 1  TO W-PERCENT
+                 ELSE
+                         MOVE W-PERCENT-ADD      TO W-PERCENT
+                 END-IF
+        PERFORM F-BIRD
+    END-IF
+    SET ENVIRONMENT "CURSOR-MODE"   TO 2
+    CALL 'C$SLEEP' USING "0.1"
+    SET ENVIRONMENT "CURSOR-MODE"   TO 3
+    DESTROY S-LOAD-FORM-Handle
+
+PARAGRAPH: F-CLOCK
+    DISPLAY DISPLAY S-LOAD-FOR-La-1.
+    PERFORM F-COMPUTE-CLOCK-PERCENT-RTN
+    MOVE W-PERCENT TO W-PERCENT-FMT1
+    MODIFY S-FR-LOAD-BAR,FILL-PERCENT = W-PERCENT,TITLE = W-PERCENT-FMT
+
+PARAGRAPH: F-BIRD
+    DISPLAY DISPLAY S-LOAD-FOR-La-1.
+    PERFORM F-COMPUTE-CLOCK-PERCENT-RTN
+    MOVE W-PERCENT TO W-PERCENT-FMT1
+    MODIFY S-FR-LOAD-BAR,FILL-PERCENT = W-PERCENT,TITLE = W-PERCENT-FMT
+
+PARAGRAPH: F-LOAD-BAR
+    DISPLAY DISPLAY S-LOAD-FOR-La-1.
+    PERFORM F-COMPUTE-CLOCK-PERCENT-RTN
+    MOVE W-PERCENT TO W-PERCENT-FMT1
+    MODIFY S-FR-LOAD-BAR,FILL-PERCENT = W-PERCENT,TITLE = W-PERCENT-FMT
+
+PARAGRAPH: F-COMPUTE-CLOCK-PERCENT-RTN
+    IF W-OPEN-MESG-TYPE = "O" OR SPACE
+        IF W-PERCENT-ADD = 0 THEN
+                         ADD 1   TO W-PERCENT
+                         IF W-PERCENT > 100 THEN
+                                 MOVE 1          TO W-PERCENT
+                         END-IF
+                 ELSE
+                         ADD W-PERCENT-ADD       TO W-PERCENT
+                         IF W-PERCENT > 100 THEN
+                                 MOVE W-PERCENT-ADD      TO W-PERCENT
+                         END-IF
+                 END-IF
+    ELSE
+        IF W-PERCENT = 0 THEN
+                         MOVE 100        TO W-PERCENT
+                 END-IF
+        IF W-PERCENT-ADD = 0 THEN
+                         SUBTRACT 1      FROM W-PERCENT
+                 ELSE
+                         SUBTRACT W-PERCENT-ADD FROM W-PERCENT
+                 END-IF
+    END-IF
+
+PARAGRAPH: F-ERR-NOTE
+    INITIALIZE W-HRMESCF-DATA, W-HRMESCF-DATA2
+    MOVE W-NOTE TO W-HRMESCF-NOTE(1)
+    MOVE "2" TO W-HRMESCF-PIC-TYPE
+    MOVE "3" TO W-HRMESCF-BUT-TYPE
+    CALL HRMESCF USING W-HRMESCF-DATA, W-HRMESCF-DATA2
+
+PARAGRAPH: F-ERR-NOTE-2
+    INITIALIZE W-HRMESCF-DATA, W-HRMESCF-DATA2
+    MOVE W-NOTE TO W-HRMESCF-NOTE(1)
+    MOVE "2" TO W-HRMESCF-PIC-TYPE
+    MOVE "3" TO W-HRMESCF-BUT-TYPE
+    CALL HRMESCF USING W-HRMESCF-DATA, W-HRMESCF-DATA2
+
+PARAGRAPH: F-ERR-NOTE-8
+    INITIALIZE W-HRMESCF-DATA, W-HRMESCF-DATA2
+    MOVE W-NOTE TO W-HRMESCF-NOTE(1)
+    MOVE "2" TO W-HRMESCF-PIC-TYPE
+    MOVE "3" TO W-HRMESCF-BUT-TYPE
+    CALL HRMESCF USING W-HRMESCF-DATA, W-HRMESCF-DATA2
+
+PARAGRAPH: F-OICA-RTN
+    OPEN I-O ICA-MST
+    IF ICA-MST-STATUS = "35"
+        OPEN    OUTPUT ICA-MST
+        CLOSE   ICA-MST
+        OPEN    I-O ICA-MST
+    END-IF
+    INITIALIZE ICA-MST-REC
+
+PARAGRAPH: F-OICA-EXIT
+    EXIT
+
+PARAGRAPH: F-OICB-RTN
+    OPEN I-O ICB-MST
+    IF ICB-MST-STATUS = "35"
+        OPEN    OUTPUT ICB-MST
+        CLOSE   ICB-MST
+        OPEN    I-O ICB-MST
+    END-IF
+    INITIALIZE ICB-MST-REC
+
+PARAGRAPH: F-OICB-EXIT
+    EXIT
+
+PARAGRAPH: F-OK-NOTE
+    PERFORM F-CLEAR-HRSTATUS-RTN
+    MOVE "回應訊息" TO W-HRSTATUS-P1
+    MOVE W-NOTE TO W-HRSTATUS-P2
+    PERFORM F-DISPLAY-HRSTATUS-RTN
+    CALL C$SLEEP USING 1
+    PERFORM F-CLEAR-HRSTATUS-RTN
+
+PARAGRAPH: F-WAR-NOTE
+    PERFORM F-CLEAR-HRSTATUS-RTN
+    MOVE "回應訊息" TO W-HRSTATUS-P1
+    MOVE W-NOTE TO W-HRSTATUS-P2
+    PERFORM F-DISPLAY-HRSTATUS-RTN
+
+PARAGRAPH: F-BLANK
+    PERFORM F-CLEAR-HRSTATUS-RTN
+
+PARAGRAPH: F-DIS-DEL-MSG
+    INITIALIZE W-NOTE
+    MOVE "資料刪除中....請勿按中斷鍵..." TO W-NOTE
+    PERFORM F-WAR-NOTE
+
+PARAGRAPH: F-DIS-WRT-MSG
+    INITIALIZE W-NOTE
+    MOVE "資料存檔中....請勿按中斷鍵..." TO W-NOTE
+    PERFORM F-WAR-NOTE
+
+PARAGRAPH: F-CREATE-HRSTATUS-RTN
+    CONTINUE
+
+PARAGRAPH: F-DISPLAY-HRSTATUS-RTN
+    MODIFY S-HRSTATUS-1-Handle
+                 PANEL-WIDTHS (80),
+                 PANEL-STYLE (1),
+                 PANEL-TEXT (W-HRSTATUS-P2),
+                 GRIP, FONT IS 細明體11
+
+PARAGRAPH: F-CLEAR-HRSTATUS-RTN
+    INITIALIZE W-HRSTATUS-P1, W-HRSTATUS-P2, W-HRSTATUS-P3, W-HRSTATUS-P4
+    INITIALIZE W-HRSTATUS-P5, W-HRSTATUS-P6, W-HRSTATUS-P7
+    MOVE "回應訊息" TO W-HRSTATUS-P1
+    PERFORM F-DISPLAY-HRSTATUS-RTN
+

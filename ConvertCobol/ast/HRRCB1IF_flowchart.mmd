@@ -1,0 +1,303 @@
+flowchart TD
+    Acu_Main_Logic["Acu-Main-Logic"]
+    Acu_Extended_File_Status["Acu-Extended-File-Status"]
+    Acu_Show_Msg["Acu-Show-Msg"]
+    Acu_Message_Box["Acu-Message-Box"]
+    Acu_Initial_Routine["Acu-Initial-Routine"]
+    Acu_Init_Font["Acu-Init-Font"]
+    Acu_Exit_Rtn["Acu-Exit-Rtn"]
+    Acu_S_RCB1_Routine["Acu-S-RCB1-Routine"]
+    Acu_S_HT_DATA_Routine["Acu-S-HT-DATA-Routine"]
+    Acu_S_RCB1_Scrn["Acu-S-RCB1-Scrn"]
+    Acu_S_HT_DATA_Scrn["Acu-S-HT-DATA-Scrn"]
+    Acu_S_RCB1_Create_Win["Acu-S-RCB1-Create-Win"]
+    Acu_S_HT_DATA_Create_Win["Acu-S-HT-DATA-Create-Win"]
+    Acu_S_RCB1_Init_Data["Acu-S-RCB1-Init-Data"]
+    Acu_S_HT_DATA_Init_Data["Acu-S-HT-DATA-Init-Data"]
+    Acu_S_RCB1_Proc["Acu-S-RCB1-Proc"]
+    Acu_S_HT_DATA_Proc["Acu-S-HT-DATA-Proc"]
+    Acu_S_RCB1_Gd_1_Content["Acu-S-RCB1-Gd-1-Content"]
+    Acu_S_RCB1_Evaluate_Func["Acu-S-RCB1-Evaluate-Func"]
+    Acu_S_HT_DATA_Evaluate_Func["Acu-S-HT-DATA-Evaluate-Func"]
+    Acu_S_RCB1_Exit["Acu-S-RCB1-Exit"]
+    Acu_S_HT_DATA_Exit["Acu-S-HT-DATA-Exit"]
+    Acu_S_RCB1_Mn_1_Menu["Acu-S-RCB1-Mn-1-Menu"]
+    Acu_S_RCB1_Mn_1["Acu-S-RCB1-Mn-1"]
+    Acu_S_RCB1_Mn_1_Exit["Acu-S-RCB1-Mn-1-Exit"]
+    S_RCB1_Exception_Proc["S-RCB1-Exception-Proc"]
+    S_RCB1_Gd_1_Event_Proc["S-RCB1-Gd-1-Event-Proc"]
+    S_HT_DATA_Exception_Proc["S-HT-DATA-Exception-Proc"]
+    F_RCB1_Bef_Create["F-RCB1-Bef-Create"]
+    F_RCB1_Aft_Create["F-RCB1-Aft-Create"]
+    F_RCB1_Aft_Initdata["F-RCB1-Aft-Initdata"]
+    F_RCB1_Ex_Other["F-RCB1-Ex-Other"]
+    F_RCB_RTN["F-RCB-RTN"]
+    F_STOP_RTN["F-STOP-RTN"]
+    F_HRIBGCF_MOVE_QQ["F-HRIBGCF-MOVE-QQ"]
+    F_RCB1_Gd_1_Ev_Msg_Begin_Entry["F-RCB1-Gd-1-Ev-Msg-Begin-Entry"]
+    F_RCB1_Gd_1_Ev_Msg_Begin_Drag["F-RCB1-Gd-1-Ev-Msg-Begin-Drag"]
+    F_RCB1_Gd_1_Ev_Msg_Goto_Cell["F-RCB1-Gd-1-Ev-Msg-Goto-Cell"]
+    F_COLOR_RTN["F-COLOR-RTN"]
+    F_RCB1_Gd_1_Ev_Msg_Goto_Cell_Mouse["F-RCB1-Gd-1-Ev-Msg-Goto-Cell-Mouse"]
+    F_TOP_TITLE["F-TOP-TITLE"]
+    F_IPDIF_RTN["F-IPDIF-RTN"]
+    F_IPDNO_RTN["F-IPDNO-RTN"]
+    F_IPDNO_END["F-IPDNO-END"]
+    F_HTICB2BF_NOTE_RTN["F-HTICB2BF-NOTE-RTN"]
+    F_HTICB2BF_NOTE_END["F-HTICB2BF-NOTE-END"]
+    F_RCB1_Gd_1_Ev_Msg_Paged_Prev["F-RCB1-Gd-1-Ev-Msg-Paged-Prev"]
+    F_RCB1_Gd_1_Ev_Msg_Paged_Next["F-RCB1-Gd-1-Ev-Msg-Paged-Next"]
+    F_RCB1_Gd_1_Ev_Msg_Paged_Nextpage["F-RCB1-Gd-1-Ev-Msg-Paged-Nextpage"]
+    F_RCB1_Gd_1_Ev_Msg_Paged_Prevpage["F-RCB1-Gd-1-Ev-Msg-Paged-Prevpage"]
+    F_HT_DATA_Ex_Cmd_Close["F-HT-DATA-Ex-Cmd-Close"]
+    F_HT_DATA_Aft_Initdata["F-HT-DATA-Aft-Initdata"]
+    S_HT_DATA_Ex_Other["S-HT-DATA-Ex-Other"]
+    F_CHK_FORM_RTN["F-CHK-FORM-RTN"]
+    F_SHOW_FORM1_RTN["F-SHOW-FORM1-RTN"]
+    F_SHOW_FORM2_RTN["F-SHOW-FORM2-RTN"]
+    F_SHOW_FORM3_RTN["F-SHOW-FORM3-RTN"]
+    F_FUN_RTN["F-FUN-RTN"]
+    F_FUN_EXIT["F-FUN-EXIT"]
+    F_MESG1_RTN["F-MESG1-RTN"]
+    F_MESG2_RTN["F-MESG2-RTN"]
+    F_MESG3_RTN["F-MESG3-RTN"]
+    F_IPLIF_RTN["F-IPLIF-RTN"]
+    F_PICB_RTN["F-PICB-RTN"]
+    F_CHK_ECB1_RTN["F-CHK-ECB1-RTN"]
+    F_CHK_ECB2_RTN["F-CHK-ECB2-RTN"]
+    F_STARTS_RTN["F-STARTS-RTN"]
+    F_STARTG_RTN["F-STARTG-RTN"]
+    F_READN_RTN["F-READN-RTN"]
+    F_READN_EXIT["F-READN-EXIT"]
+    F_999_RTN["F-999-RTN"]
+    F_LOAD_GRID_RTN["F-LOAD-GRID-RTN"]
+    F_GET_STATUS["F-GET-STATUS"]
+    F_GET_STATUS1["F-GET-STATUS1"]
+    F_MOVE_CHK_DATA["F-MOVE-CHK-DATA"]
+    F_MOVE_INQ_TITLE["F-MOVE-INQ-TITLE"]
+    F_QTY_RTN["F-QTY-RTN"]
+    F_CALL_HRDOSERF_RTN["F-CALL-HRDOSERF-RTN"]
+    F_ADD_RTB_QTY["F-ADD-RTB-QTY"]
+    F_DIVI_RTN["F-DIVI-RTN"]
+    F_SCREEN_DOWN["F-SCREEN-DOWN"]
+    F_SCREEN_UP["F-SCREEN-UP"]
+    F_SEARCH_IPLIF_RTN["F-SEARCH-IPLIF-RTN"]
+    F_SEARCH_RTN["F-SEARCH-RTN"]
+    F_SEARCH_1_RTN["F-SEARCH-1-RTN"]
+    F_SEARCH_2_RTN["F-SEARCH-2-RTN"]
+    F_SEARCH_3_RTN["F-SEARCH-3-RTN"]
+    F_DEL_RTN["F-DEL-RTN"]
+    F_END_MESG["F-END-MESG"]
+    F_F5_PRINT_RTN["F-F5-PRINT-RTN"]
+    F_PRINT_RTN["F-PRINT-RTN"]
+    F_REPORT_RTN["F-REPORT-RTN"]
+    F_CALL_HTPATRPF["F-CALL-HTPATRPF"]
+    F_HT_DATA_RTN["F-HT-DATA-RTN"]
+    F_DELETE_RTN["F-DELETE-RTN"]
+    F_HT_DELETE_RTN["F-HT-DELETE-RTN"]
+    F_HT_DELETE_EXIT["F-HT-DELETE-EXIT"]
+    F_HT_DELETE_RTN2["F-HT-DELETE-RTN2"]
+    F_CHK_DEL_RTN["F-CHK-DEL-RTN"]
+    F_CHK_DEL_EXIT["F-CHK-DEL-EXIT"]
+    F_HT_DELETE_RTN3["F-HT-DELETE-RTN3"]
+    F_DEL_LNK_RTN["F-DEL-LNK-RTN"]
+    F_DEL_LNK_RTN1["F-DEL-LNK-RTN1"]
+    F_DEL_SCH_RTN["F-DEL-SCH-RTN"]
+    F_WRITE_GCB_MI_RTN["F-WRITE-GCB-MI-RTN"]
+    F_WRITE_GCB_MI_RTN1["F-WRITE-GCB-MI-RTN1"]
+    F_REWRITE_ICA_RTN["F-REWRITE-ICA-RTN"]
+    F_DELETE_FNS_RTN["F-DELETE-FNS-RTN"]
+    F_WRITE_HRDTB_RTN["F-WRITE-HRDTB-RTN"]
+    F_WRITE_HRDTA_RTN["F-WRITE-HRDTA-RTN"]
+    F_READ_RNUJ_RTN["F-READ-RNUJ-RTN"]
+    F_READ_RNUJ_EXIT["F-READ-RNUJ-EXIT"]
+    F_BEFORE_RTN["F-BEFORE-RTN"]
+    F_AFTER_RTN["F-AFTER-RTN"]
+    F_DEL_ANN_MST["F-DEL-ANN-MST"]
+    F_READ_ANN_MST["F-READ-ANN-MST"]
+    F_OPEN_RTN["F-OPEN-RTN"]
+    F_OPEN_EXIT["F-OPEN-EXIT"]
+    F_HT_OPEN["F-HT-OPEN"]
+    F_CLOSE_RTN["F-CLOSE-RTN"]
+    F_CLOSE_EXIT["F-CLOSE-EXIT"]
+    F_HT_CLOSE["F-HT-CLOSE"]
+    F_HT_CLOSE1["F-HT-CLOSE1"]
+    F_HT_CLOSE2["F-HT-CLOSE2"]
+    F_INIT_RTN["F-INIT-RTN"]
+    F_INIT_EXIT["F-INIT-EXIT"]
+    F_FORM_TITLE["F-FORM-TITLE"]
+    F_NID_1000["F-NID-1000"]
+    F_NID_1099["F-NID-1099"]
+    F_NID_1198["F-NID-1198"]
+    F_NID_1799["F-NID-1799"]
+    F_CHK_LOG_RTN["F-CHK-LOG-RTN"]
+    F_CHK_LOG_EXIT["F-CHK-LOG-EXIT"]
+    F_CATCH_SEL_RTN["F-CATCH-SEL-RTN"]
+    F_PACK_RTN["F-PACK-RTN"]
+    F_MOVE_WK_NAME_RTN["F-MOVE-WK-NAME-RTN"]
+    F_MOVE_WK_NAME_EXIT["F-MOVE-WK-NAME-EXIT"]
+    F_EXIT_RTN["F-EXIT-RTN"]
+    F_START_HRDTB_RTN["F-START-HRDTB-RTN"]
+    F_START_HRDTB_EXIT["F-START-HRDTB-EXIT"]
+    F_READ_TEST_RTN["F-READ-TEST-RTN"]
+    F_READ_TEST_EXIT["F-READ-TEST-EXIT"]
+    F_READ_HRDTB_RTN["F-READ-HRDTB-RTN"]
+    F_READ_HRDTB_EXIT["F-READ-HRDTB-EXIT"]
+    F_READ_HIECB_RTN["F-READ-HIECB-RTN"]
+    F_READ_HIECB_EXIT["F-READ-HIECB-EXIT"]
+    F_MOVE_GRID_RTN["F-MOVE-GRID-RTN"]
+    F_MOVE_GRID_EXIT["F-MOVE-GRID-EXIT"]
+    F_DEL_TO_WRITE_HRUDL3_RTN["F-DEL-TO-WRITE-HRUDL3-RTN"]
+    F_WRT_LOG2_RTN["F-WRT-LOG2-RTN"]
+    F_WRT_LOG2_EXIT["F-WRT-LOG2-EXIT"]
+    F_CHK_LOCK_RTN["F-CHK-LOCK-RTN"]
+    F_CHK_LOCK_EXIT["F-CHK-LOCK-EXIT"]
+    F_READ_ELC_SETTING["F-READ-ELC-SETTING"]
+    F_OPEN_ELC_TRN["F-OPEN-ELC-TRN"]
+    F_CLOSE_ELC_TRN["F-CLOSE-ELC-TRN"]
+    F_WRITE_ELC_TRN_11["F-WRITE-ELC-TRN-11"]
+    F_WRITE_ELC_TRN_21["F-WRITE-ELC-TRN-21"]
+    F_WRITE_ELC_TRN_211["F-WRITE-ELC-TRN-211"]
+    F_WRITE_ELC_TRN_41["F-WRITE-ELC-TRN-41"]
+    F_WRITE_GCA_OLD_RTN["F-WRITE-GCA-OLD-RTN"]
+    F_WRITE_GCA_OLD_EXIT["F-WRITE-GCA-OLD-EXIT"]
+    F_WRITE_GCA_NEW_RTN["F-WRITE-GCA-NEW-RTN"]
+    F_WRITE_GCA_NEW_EXIT["F-WRITE-GCA-NEW-EXIT"]
+    F_WRITE_GCB_RTN["F-WRITE-GCB-RTN"]
+    F_WRITE_GCB_EXIT["F-WRITE-GCB-EXIT"]
+    F_ADD_MT_RTN["F-ADD-MT-RTN"]
+    F_ADD_MT_EXIT["F-ADD-MT-EXIT"]
+    F_SEARCH_DPT_RTN["F-SEARCH-DPT-RTN"]
+    F_SEARCH_DR_RTN["F-SEARCH-DR-RTN"]
+    F_DEP_RTN["F-DEP-RTN"]
+    F_DR_RTN["F-DR-RTN"]
+    F_OPEN_MESG["F-OPEN-MESG"]
+    F_CLOSE_MESG["F-CLOSE-MESG"]
+    F_WIN_CLOCK["F-WIN-CLOCK"]
+    F_CLOSE_WIN_CLOCK["F-CLOSE-WIN-CLOCK"]
+    F_CLOCK["F-CLOCK"]
+    F_BIRD["F-BIRD"]
+    F_LOAD_BAR["F-LOAD-BAR"]
+    F_COMPUTE_CLOCK_PERCENT_RTN["F-COMPUTE-CLOCK-PERCENT-RTN"]
+    F_ERR_NOTE["F-ERR-NOTE"]
+    F_ERR_NOTE_2["F-ERR-NOTE-2"]
+    F_ERR_NOTE_8["F-ERR-NOTE-8"]
+    F_OICA_RTN["F-OICA-RTN"]
+    F_OICA_EXIT["F-OICA-EXIT"]
+    F_OICB_RTN["F-OICB-RTN"]
+    F_OICB_EXIT["F-OICB-EXIT"]
+    F_OK_NOTE["F-OK-NOTE"]
+    F_WAR_NOTE["F-WAR-NOTE"]
+    F_BLANK["F-BLANK"]
+    F_DIS_DEL_MSG["F-DIS-DEL-MSG"]
+    F_DIS_WRT_MSG["F-DIS-WRT-MSG"]
+    F_CREATE_HRSTATUS_RTN["F-CREATE-HRSTATUS-RTN"]
+    F_DISPLAY_HRSTATUS_RTN["F-DISPLAY-HRSTATUS-RTN"]
+    F_CLEAR_HRSTATUS_RTN["F-CLEAR-HRSTATUS-RTN"]
+
+    Acu_Main_Logic --> Acu_Initial_Routine
+    Acu_Main_Logic --> Acu_S_RCB1_Routine
+    Acu_Main_Logic --> F_STOP_RTN
+    Acu_Extended_File_Status --> Acu_Show_Msg
+    Acu_Show_Msg --> Acu_Message_Box
+    Acu_Initial_Routine --> Acu_Init_Font
+    Acu_S_RCB1_Routine --> Acu_S_RCB1_Scrn
+    Acu_S_RCB1_Routine --> Acu_S_RCB1_Proc
+    Acu_S_HT_DATA_Routine --> Acu_S_HT_DATA_Scrn
+    Acu_S_HT_DATA_Routine --> Acu_S_HT_DATA_Proc
+    Acu_S_RCB1_Scrn --> Acu_S_RCB1_Create_Win
+    Acu_S_RCB1_Scrn --> Acu_S_RCB1_Init_Data
+    Acu_S_HT_DATA_Scrn --> Acu_S_HT_DATA_Create_Win
+    Acu_S_HT_DATA_Scrn --> Acu_S_HT_DATA_Init_Data
+    Acu_S_RCB1_Create_Win --> F_RCB1_Bef_Create
+    Acu_S_RCB1_Create_Win --> Acu_S_RCB1_Mn_1_Menu
+    Acu_S_RCB1_Create_Win --> F_RCB1_Aft_Create
+    Acu_S_RCB1_Init_Data --> Acu_S_RCB1_Gd_1_Content
+    Acu_S_RCB1_Init_Data --> F_RCB1_Aft_Initdata
+    Acu_S_HT_DATA_Init_Data --> F_HT_DATA_Aft_Initdata
+    Acu_S_RCB1_Mn_1_Menu --> Acu_S_RCB1_Mn_1
+    S_RCB1_Exception_Proc --> F_RCB1_Ex_Other
+    F_RCB1_Bef_Create --> F_HT_OPEN
+    F_RCB1_Bef_Create --> F_TOP_TITLE
+    F_RCB1_Aft_Create --> F_CREATE_HRSTATUS_RTN
+    F_RCB1_Aft_Initdata --> F_INIT_RTN
+    F_RCB1_Aft_Initdata --> F_BLANK
+    F_RCB1_Ex_Other --> F_BLANK
+    F_RCB_RTN --> F_TOP_TITLE
+    F_RCB_RTN --> F_FORM_TITLE
+    F_RCB_RTN --> F_FUN_RTN
+    F_STOP_RTN --> F_HT_CLOSE
+    F_RCB1_Gd_1_Ev_Msg_Begin_Entry --> F_RCB1_GD_1_EV_MSG_GOTO_CELL
+    F_RCB1_Gd_1_Ev_Msg_Goto_Cell --> F_COLOR_RTN
+    F_RCB1_Gd_1_Ev_Msg_Goto_Cell_Mouse --> F_COLOR_RTN
+    F_RCB1_Gd_1_Ev_Msg_Paged_Prev --> F_BLANK
+    F_RCB1_Gd_1_Ev_Msg_Paged_Next --> F_BLANK
+    F_RCB1_Gd_1_Ev_Msg_Paged_Nextpage --> F_BLANK
+    F_RCB1_Gd_1_Ev_Msg_Paged_Nextpage --> F_SCREEN_DOWN
+    F_RCB1_Gd_1_Ev_Msg_Paged_Prevpage --> F_BLANK
+    F_RCB1_Gd_1_Ev_Msg_Paged_Prevpage --> F_SCREEN_UP
+    F_HT_DATA_Ex_Cmd_Close --> Acu_S_HT_DATA_Exit
+    F_HT_DATA_Aft_Initdata --> F_HT_DATA_RTN
+    S_HT_DATA_Ex_Other --> F_HT_DATA_EX_CMD_CLOSE
+    F_SHOW_FORM1_RTN --> ACU_S_RCB1_GD_1_CONTENT
+    F_SHOW_FORM2_RTN --> ACU_S_RCB1_GD_1_CONTENT
+    F_SHOW_FORM3_RTN --> ACU_S_RCB1_GD_1_CONTENT
+    F_FUN_RTN --> F_CHK_FORM_RTN
+    F_MESG2_RTN --> F_ERR_NOTE
+    F_PICB_RTN --> F_999_RTN
+    F_CHK_ECB1_RTN --> F_STARTS_RTN
+    F_CHK_ECB1_RTN --> F_READN_RTN
+    F_CHK_ECB2_RTN --> F_STARTS_RTN
+    F_CHK_ECB2_RTN --> F_READN_RTN
+    F_999_RTN --> F_CHK_FORM_RTN
+    F_MOVE_INQ_TITLE --> F_SEARCH_DPT_RTN
+    F_MOVE_INQ_TITLE --> F_SEARCH_DR_RTN
+    F_QTY_RTN --> F_CALL_HRDOSERF_RTN
+    F_DEL_RTN --> F_RCB_RTN
+    F_END_MESG --> F_WAR_NOTE
+    F_HT_DELETE_RTN --> F_CHK_LOCK_RTN
+    F_HT_DELETE_RTN3 --> F_DEL_SCH_RTN
+    F_DEL_LNK_RTN --> F_DEL_LNK_RTN1
+    F_WRITE_GCB_MI_RTN --> F_WRITE_GCB_MI_RTN1
+    F_WRITE_GCB_MI_RTN1 --> F_WRITE_GCB_RTN
+    F_WRITE_HRDTA_RTN --> F_READ_RNUJ_RTN
+    F_DEL_ANN_MST --> F_READ_ANN_MST
+    F_OPEN_RTN --> F_OPEN_MESG
+    F_OPEN_RTN --> F_WIN_CLOCK
+    F_OPEN_RTN --> F_CLOCK
+    F_OPEN_RTN --> F_OICA_RTN
+    F_OPEN_RTN --> F_OICB_RTN
+    F_OPEN_RTN --> F_DEP_RTN
+    F_OPEN_RTN --> F_DR_RTN
+    F_OPEN_RTN --> F_NID_1000
+    F_OPEN_RTN --> F_NID_1099
+    F_OPEN_RTN --> F_NID_1198
+    F_OPEN_RTN --> F_NID_1799
+    F_OPEN_RTN --> F_CLOSE_WIN_CLOCK
+    F_HT_OPEN --> F_OPEN_MESG
+    F_HT_OPEN --> F_WIN_CLOCK
+    F_HT_OPEN --> F_CLOCK
+    F_HT_OPEN --> F_CLOSE_WIN_CLOCK
+    F_CLOSE_RTN --> F_CLOSE_MESG
+    F_CLOSE_RTN --> F_WIN_CLOCK
+    F_CLOSE_RTN --> F_BIRD
+    F_CLOSE_RTN --> F_CLOSE_WIN_CLOCK
+    F_HT_CLOSE --> F_CLOSE_MESG
+    F_HT_CLOSE --> F_WIN_CLOCK
+    F_HT_CLOSE --> F_CLOSE_WIN_CLOCK
+    F_HT_CLOSE1 --> F_BIRD
+    F_HT_CLOSE2 --> F_BIRD
+    F_READ_TEST_RTN --> F_CHK_FORM_RTN
+    F_WRITE_ELC_TRN_21 --> F_WRITE_ELC_TRN_211
+    F_WRITE_ELC_TRN_21 --> F_WRITE_ELC_TRN_41
+    F_CLOCK --> F_COMPUTE_CLOCK_PERCENT_RTN
+    F_BIRD --> F_COMPUTE_CLOCK_PERCENT_RTN
+    F_LOAD_BAR --> F_COMPUTE_CLOCK_PERCENT_RTN
+    F_OK_NOTE --> F_CLEAR_HRSTATUS_RTN
+    F_OK_NOTE --> F_DISPLAY_HRSTATUS_RTN
+    F_WAR_NOTE --> F_CLEAR_HRSTATUS_RTN
+    F_WAR_NOTE --> F_DISPLAY_HRSTATUS_RTN
+    F_BLANK --> F_CLEAR_HRSTATUS_RTN
+    F_DIS_DEL_MSG --> F_WAR_NOTE
+    F_DIS_WRT_MSG --> F_WAR_NOTE
+    F_CLEAR_HRSTATUS_RTN --> F_DISPLAY_HRSTATUS_RTN

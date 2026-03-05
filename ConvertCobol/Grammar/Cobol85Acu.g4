@@ -742,7 +742,7 @@ screenSection
     ;
 
 acuScreenContinuation
-    : (identifier | literal | COMMACHAR | EXCEPTION | PROCEDURE | INTEGERLITERAL | FLOATINGPOINTLITERAL | STRINGLITERAL | NONNUMERICLITERAL)+ (DOT_FS)?
+    : (identifier | literal | COMMACHAR | EXCEPTION | HANDLE | IS | DISPLAY | ENVIRONMENT | LINE | LINES | COL | COLUMN | SIZE | TITLE | VALUE | STATUS | EVENT | CONTROL | LABEL | FROM | TO | NO | ID | PIC | PICTURE | ALTERNATE | MODIFY | INTEGERLITERAL | NONNUMERICLITERAL | LPARENCHAR | RPARENCHAR | EQUALCHAR)+ (DOT_FS)?
     ;
 
 screenDescriptionEntryTerminator
@@ -1293,8 +1293,9 @@ dataJustifiedClause
     : (JUSTIFIED | JUST) RIGHT?
     ;
 
+// ACUCOBOL extension: OCCURS count may be an identifier (variable-length table with runtime size)
 dataOccursClause
-    : OCCURS integerLiteral dataOccursTo? TIMES? (DEPENDING ON? qualifiedDataName)? dataOccursSort* (
+    : OCCURS (integerLiteral | identifier) dataOccursTo? TIMES? (DEPENDING ON? qualifiedDataName)? dataOccursSort* (
         INDEXED BY? LOCAL? indexName+
     )?
     ;
@@ -1565,6 +1566,7 @@ statement
     | acuModifyStatement
     | acuInquireStatement
     | acuDestroyStatement
+    | acuUnlockStatement
     ;
 
 // accept statement
@@ -1573,6 +1575,7 @@ acceptStatement
     : ACCEPT identifier (
         acceptFromDateStatement
         | acceptFromEscapeKeyStatement
+        | acceptFromEnvironmentStatement
         | acceptFromMnemonicStatement
         | acceptMessageCountStatement
     )? onExceptionClause? notOnExceptionClause? END_ACCEPT?
@@ -1591,6 +1594,10 @@ acceptFromDateStatement
         | YYYYMMDD
         | YYYYDDD
     )
+    ;
+
+acceptFromEnvironmentStatement
+    : FROM ENVIRONMENT (identifier | literal)
     ;
 
 acceptFromMnemonicStatement
@@ -1664,7 +1671,7 @@ callStatement
     ;
 
 callUsingPhrase
-    : USING callUsingParameter+
+    : USING callUsingParameter (COMMACHAR? callUsingParameter)*
     ;
 
 callUsingParameter
@@ -1787,7 +1794,22 @@ disableStatement
 // display statement
 
 displayStatement
-    : DISPLAY displayOperand+ displayAt? displayUpon? displayWith?
+    : DISPLAY (
+        acuDisplayMessageStatement
+        | displayOperand+ displayAt? displayUpon? displayWith?
+    )
+    ;
+
+// ACUCOBOL-GT: DISPLAY MESSAGE "text" / DISPLAY MESSAGE BOX var TYPE IS var ...
+acuDisplayMessageStatement
+    : MESSAGE displayOperand+ acuDisplayMessageClause*
+    ;
+
+acuDisplayMessageClause
+    : TYPE IS? (identifier | literal)
+    | DEFAULT IS? (identifier | literal)
+    | RETURNING identifier
+    | identifier IS? (identifier | literal)
     ;
 
 displayOperand
@@ -1939,7 +1961,7 @@ exhibitOperand
 // exit statement
 
 exitStatement
-    : EXIT PROGRAM?
+    : EXIT (PROGRAM | PARAGRAPH | SECTION)?
     ;
 
 // generate statement
@@ -2053,11 +2075,11 @@ inspectReplacingCharacters
     ;
 
 inspectAllLeadings
-    : (ALL | LEADING) inspectAllLeading+
+    : (ALL | LEADING | TRAILING) inspectAllLeading+
     ;
 
 inspectReplacingAllLeadings
-    : (ALL | LEADING | FIRST) inspectReplacingAllLeading+
+    : (ALL | LEADING | FIRST | TRAILING) inspectReplacingAllLeading+
     ;
 
 inspectAllLeading
@@ -2276,7 +2298,7 @@ readInto
     ;
 
 readWith
-    : WITH? ((KEPT | NO) LOCK | WAIT)
+    : WITH? ((KEPT | NO)? LOCK | WAIT)
     ;
 
 readKey
@@ -2356,11 +2378,15 @@ returnInto
 // rewrite statement
 
 rewriteStatement
-    : REWRITE recordName rewriteFrom? invalidKeyPhrase? notInvalidKeyPhrase? END_REWRITE?
+    : REWRITE recordName rewriteFrom? rewriteWith? invalidKeyPhrase? notInvalidKeyPhrase? END_REWRITE?
     ;
 
 rewriteFrom
     : FROM identifier
+    ;
+
+rewriteWith
+    : WITH? LOCK
     ;
 
 // search statement
@@ -2422,7 +2448,7 @@ sendAdvancingMnemonic
 // set statement
 
 setStatement
-    : SET (setToStatement+ | setUpDownByStatement)
+    : SET (setToStatement+ | setUpDownByStatement | setEnvironmentStatement)
     ;
 
 setToStatement
@@ -2448,6 +2474,10 @@ setToValue
 setByValue
     : identifier
     | literal
+    ;
+
+setEnvironmentStatement
+    : ENVIRONMENT (identifier | literal) TO (identifier | literal)
     ;
 
 // sort statement
@@ -2696,7 +2726,7 @@ acuCreateStatement
     ;
 
 acuModifyStatement
-    : MODIFY identifier acuGuiPropertyList?
+    : MODIFY identifier COMMACHAR? acuGuiPropertyList? COMMACHAR?
     ;
 
 acuInquireStatement
@@ -2704,7 +2734,11 @@ acuInquireStatement
     ;
 
 acuDestroyStatement
-    : DESTROY identifier
+    : DESTROY identifier (COMMACHAR? identifier)*
+    ;
+
+acuUnlockStatement
+    : UNLOCK fileName
     ;
 
 acuGuiPropertyList
@@ -2712,8 +2746,12 @@ acuGuiPropertyList
     ;
 
 acuGuiProperty
-    : identifier (IS? (identifier | literal | LPARENCHAR arithmeticExpression RPARENCHAR))?
-    | identifier LPARENCHAR (identifier | literal | arithmeticExpression) RPARENCHAR
+    : acuGuiPropertyName ((IS | EQUALCHAR)? (identifier | literal | LPARENCHAR arithmeticExpression (COMMACHAR arithmeticExpression)* RPARENCHAR))?
+    | acuGuiPropertyName LPARENCHAR (identifier | literal | arithmeticExpression) (COMMACHAR (identifier | literal | arithmeticExpression))* RPARENCHAR
+    ;
+
+acuGuiPropertyName
+    : identifier | TITLE | MESSAGE | SIZE | STATUS | EVENT
     ;
 
 writeFromPhrase
@@ -3263,6 +3301,7 @@ cobolWord
     | UNDERLINE
     | UNSIGNED_LONG
     | UNSIGNED_SHORT
+    | UNLOCK
     | VIRTUAL
     | WAIT
     | YEAR
@@ -4760,6 +4799,10 @@ PAGE_COUNTER
     : P A G E MINUSCHAR C O U N T E R
     ;
 
+PARAGRAPH
+    : P A R A G R A P H
+    ;
+
 PASSWORD
     : P A S S W O R D
     ;
@@ -5408,6 +5451,10 @@ UNSIGNED_SHORT
     : U N S I G N E D MINUSCHAR S H O R T
     ;
 
+UNLOCK
+    : U N L O C K
+    ;
+
 UNSTRING
     : U N S T R I N G
     ;
@@ -5659,10 +5706,12 @@ INTEGERLITERAL
     : (PLUSCHAR | MINUSCHAR)? [0-9]+
     ;
 
+// Split into DOT-decimal and COMMA-decimal to prevent `,1` from matching as NUMERICLITERAL
+// DOT variant: allows zero leading digits (e.g. .5, -.05)
+// COMMA variant: requires at least one leading digit (e.g. 1,5) — prevents bare `,1` from matching
 NUMERICLITERAL
-    : (PLUSCHAR | MINUSCHAR)? [0-9]* (DOT | COMMACHAR) [0-9]+ (
-        ('e' | 'E') (PLUSCHAR | MINUSCHAR)? [0-9]+
-    )?
+    : (PLUSCHAR | MINUSCHAR)? [0-9]* DOT [0-9]+ (('e' | 'E') (PLUSCHAR | MINUSCHAR)? [0-9]+)?
+    | (PLUSCHAR | MINUSCHAR)? [0-9]+ COMMACHAR [0-9]+ (('e' | 'E') (PLUSCHAR | MINUSCHAR)? [0-9]+)?
     ;
 
 IDENTIFIER

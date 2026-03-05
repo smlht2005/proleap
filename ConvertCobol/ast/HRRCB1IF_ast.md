@@ -1,27 +1,27 @@
-# COBOL AST Report: Unknown
+# COBOL AST Report: HRRCB1IF
 
-> 產生時間: 2026-02-11 14:44:12
+> 產生時間: 2026-03-04 18:25:05
 > 原始檔案: `HRRCB1IF.cbl`
 > 解析工具: ANTLR4 Cobol85Acu (C#)
-> 解析耗時: 474 ms
+> 解析耗時: 13235 ms
 
 ## 概覽
 
 | 項目 | 數值 |
 |------|------|
-| PROGRAM-ID | - |
-| FD 項目 | 0 |
-| 01-Level 資料項目 | 0 |
-| 77-Level 資料項目 | 0 |
-| 全部資料項目 | 0 |
+| PROGRAM-ID | HRRCB1IF |
+| FD 項目 | 72 |
+| 01-Level 資料項目 | 314 |
+| 77-Level 資料項目 | 19 |
+| 全部資料項目 | 6571 |
 | Sections | 0 |
 | Paragraphs | 195 |
-| 語句總數 | 1478 |
+| 語句總數 | 1394 |
 | 含 SCREEN SECTION（已註解） | 是 |
 
 ## IDENTIFICATION DIVISION
 
-- **PROGRAM-ID**: `-`
+- **PROGRAM-ID**: `HRRCB1IF`
 
 ## ENVIRONMENT DIVISION
 
@@ -29,7 +29,7 @@
 
 ## DATA DIVISION
 
-### FILE SECTION (0 FD)
+### FILE SECTION (72 FD)
 
 
 ## PROCEDURE DIVISION
@@ -52,9 +52,9 @@
 
 #### Acu-Message-Box
 
+- IF: 4
 - MOVE: 2
-- IF: 1
-- INSPECT: 1
+- DISPLAY: 1
 
 #### Acu-Initial-Routine
 
@@ -91,11 +91,15 @@
 
 #### Acu-S-RCB1-Create-Win
 
-- PERFORM: 1
+- PERFORM: 3
+- CONTINUE: 1
+- MOVE: 1
+- CALL: 1
 - DISPLAY: 1
 
 #### Acu-S-HT-DATA-Create-Win
 
+- CONTINUE: 1
 - DISPLAY: 1
 
 #### Acu-S-RCB1-Init-Data
@@ -120,7 +124,7 @@
 
 #### Acu-S-RCB1-Gd-1-Content
 
-- MODIFY: 10
+- MODIFY: 15
 
 #### Acu-S-RCB1-Evaluate-Func
 
@@ -146,8 +150,8 @@
 
 #### Acu-S-RCB1-Mn-1
 
-- CALL: 3
-- IF: 2
+- CALL: 19
+- IF: 5
 
 #### Acu-S-RCB1-Mn-1-Exit
 
@@ -167,10 +171,10 @@
 
 #### F-RCB1-Bef-Create
 
-- MOVE: 15
-- IF: 7
-- ACCEPT: 5
+- MOVE: 14
+- IF: 4
 - PERFORM: 2
+- ACCEPT: 2
 - INITIALIZE: 1
 - CALL: 1
 
@@ -191,9 +195,6 @@
 
 - PERFORM: 1
 - EVALUATE: 1
-- MODIFY: 1
-- INQUIRE: 1
-- IF: 1
 
 #### F-RCB-RTN
 
@@ -203,13 +204,14 @@
 
 #### F-STOP-RTN
 
+- DESTROY: 2
 - IF: 1
 - INITIALIZE: 1
 - MOVE: 1
 - CALL: 1
 - PERFORM: 1
 - EVALUATE: 1
-- DESTROY: 1
+- GOBACK: 1
 
 #### F-HRIBGCF-MOVE-QQ
 
@@ -219,11 +221,9 @@
 
 #### F-RCB1-Gd-1-Ev-Msg-Begin-Entry
 
-- PERFORM: 2
 - SET: 1
+- PERFORM: 1
 - IF: 1
-- MODIFY: 1
-- INQUIRE: 1
 
 #### F-RCB1-Gd-1-Ev-Msg-Begin-Drag
 
@@ -255,14 +255,12 @@
 
 #### F-IPDNO-RTN
 
-- MOVE: 12
-- DISPLAY: 5
-- INITIALIZE: 4
-- IF: 4
-- READ: 3
+- MOVE: 9
+- INITIALIZE: 2
+- READ: 1
 - CALL: 1
 - EVALUATE: 1
-- START: 1
+- IF: 1
 
 #### F-IPDNO-END
 
@@ -282,18 +280,12 @@
 
 - PERFORM: 1
 - IF: 1
-- OTHER: 1
-- MOVE: 1
-- MODIFY: 1
 - SET: 1
 
 #### F-RCB1-Gd-1-Ev-Msg-Paged-Next
 
 - PERFORM: 1
 - IF: 1
-- ADD: 1
-- MOVE: 1
-- MODIFY: 1
 - SET: 1
 
 #### F-RCB1-Gd-1-Ev-Msg-Paged-Nextpage
@@ -320,9 +312,6 @@
 
 #### F-CHK-FORM-RTN
 
-- MODIFY: 3
-- PERFORM: 3
-- MOVE: 3
 - EVALUATE: 1
 
 #### F-SHOW-FORM1-RTN
@@ -334,7 +323,7 @@
 #### F-SHOW-FORM2-RTN
 
 - CALL: 8
-- MODIFY: 7
+- MODIFY: 5
 - PERFORM: 1
 - IF: 1
 
@@ -424,15 +413,15 @@
 
 #### F-LOAD-GRID-RTN
 
-- MOVE: 24
-- IF: 10
+- MOVE: 12
+- IF: 9
 - INITIALIZE: 6
-- PERFORM: 4
 - READ: 2
 - EVALUATE: 1
 - STRING: 1
 - INSPECT: 1
 - START: 1
+- PERFORM: 1
 - MODIFY: 1
 - ADD: 1
 
@@ -445,8 +434,7 @@
 
 #### F-GET-STATUS1
 
-- IF: 3
-- MOVE: 2
+- IF: 1
 - READ: 1
 
 #### F-MOVE-CHK-DATA
@@ -458,11 +446,14 @@
 
 #### F-MOVE-INQ-TITLE
 
-- MOVE: 16
+- MOVE: 29
 - IF: 8
-- ACCEPT: 5
-- MODIFY: 2
-- STRING: 1
+- INITIALIZE: 3
+- PERFORM: 3
+- ACCEPT: 2
+- READ: 2
+- CALL: 2
+- DISPLAY: 1
 
 #### F-QTY-RTN
 
@@ -491,14 +482,7 @@
 
 #### F-SCREEN-UP
 
-- IF: 4
-- PERFORM: 3
-- MOVE: 2
-- OTHER: 1
-- MODIFY: 1
-- INQUIRE: 1
-- COMPUTE: 1
-- INITIALIZE: 1
+- IF: 1
 
 #### F-SEARCH-IPLIF-RTN
 
@@ -526,8 +510,8 @@
 #### F-DEL-RTN
 
 - IF: 1
-- INITIALIZE: 1
 - CALL: 1
+- PERFORM: 1
 
 #### F-END-MESG
 
@@ -572,11 +556,9 @@
 
 #### F-HT-DELETE-RTN
 
-- MOVE: 6
-- IF: 5
+- IF: 3
+- MOVE: 1
 - PERFORM: 1
-- INITIALIZE: 1
-- CALL: 1
 
 #### F-HT-DELETE-EXIT
 
@@ -584,20 +566,17 @@
 
 #### F-HT-DELETE-RTN2
 
-- MOVE: 12
-- IF: 5
-- INITIALIZE: 3
-- PERFORM: 2
+- MOVE: 4
+- INITIALIZE: 1
 - CALL: 1
+- IF: 1
 
 #### F-CHK-DEL-RTN
 
-- MOVE: 4
-- INITIALIZE: 2
-- READ: 2
-- IF: 2
-- DISPLAY: 1
-- GOTO: 1
+- INITIALIZE: 1
+- MOVE: 1
+- READ: 1
+- IF: 1
 
 #### F-CHK-DEL-EXIT
 
@@ -626,14 +605,10 @@
 
 #### F-DEL-SCH-RTN
 
-- MOVE: 23
-- INITIALIZE: 5
+- INITIALIZE: 4
+- MOVE: 4
 - READ: 4
-- IF: 2
-- PERFORM: 2
-- ADD: 1
-- CALL: 1
-- CANCEL: 1
+- IF: 1
 
 #### F-WRITE-GCB-MI-RTN
 
@@ -673,9 +648,9 @@
 
 #### F-WRITE-HRDTA-RTN
 
-- MOVE: 20
-- IF: 6
-- ACCEPT: 5
+- MOVE: 19
+- IF: 3
+- ACCEPT: 2
 - PERFORM: 1
 - INITIALIZE: 1
 - WRITE: 1
@@ -688,6 +663,7 @@
 - READ: 1
 - ADD: 1
 - WRITE: 1
+- OTHER: 1
 
 #### F-READ-RNUJ-EXIT
 
@@ -704,13 +680,13 @@
 - READ: 3
 - CALL: 1
 - EVALUATE: 1
-- DISPLAY: 1
 
 #### F-DEL-ANN-MST
 
+- MOVE: 5
 - PERFORM: 1
 - IF: 1
-- EXIT: 1
+- REWRITE: 1
 
 #### F-READ-ANN-MST
 
@@ -893,17 +869,17 @@
 
 #### F-DEL-TO-WRITE-HRUDL3-RTN
 
-- MOVE: 57
-- ACCEPT: 6
-- IF: 6
+- MOVE: 56
+- ACCEPT: 3
+- IF: 3
 - INITIALIZE: 1
 - WRITE: 1
 
 #### F-WRT-LOG2-RTN
 
-- MOVE: 25
-- ACCEPT: 6
-- IF: 6
+- MOVE: 24
+- ACCEPT: 3
+- IF: 3
 - COMPUTE: 2
 - INITIALIZE: 1
 - ADD: 1
@@ -934,18 +910,22 @@
 
 - INITIALIZE: 1
 - IF: 1
-- EXIT: 1
+- MOVE: 1
+- CALL: 1
 
 #### F-CLOSE-ELC-TRN
 
 - INITIALIZE: 1
 - IF: 1
-- EXIT: 1
+- MOVE: 1
+- CALL: 1
 
 #### F-WRITE-ELC-TRN-11
 
+- MOVE: 3
 - IF: 1
-- EXIT: 1
+- INITIALIZE: 1
+- CALL: 1
 
 #### F-WRITE-ELC-TRN-21
 
@@ -953,13 +933,17 @@
 
 #### F-WRITE-ELC-TRN-211
 
+- MOVE: 4
 - IF: 1
-- EXIT: 1
+- INITIALIZE: 1
+- CALL: 1
 
 #### F-WRITE-ELC-TRN-41
 
+- MOVE: 4
 - IF: 1
-- EXIT: 1
+- INITIALIZE: 1
+- CALL: 1
 
 #### F-WRITE-GCA-OLD-RTN
 
@@ -1035,6 +1019,7 @@
 
 #### F-WIN-CLOCK
 
+- CONTINUE: 1
 - DISPLAY: 1
 
 #### F-CLOSE-WIN-CLOCK
@@ -1136,7 +1121,7 @@
 
 #### F-CREATE-HRSTATUS-RTN
 
-- DISPLAY: 1
+- CONTINUE: 1
 
 #### F-DISPLAY-HRSTATUS-RTN
 
