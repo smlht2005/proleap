@@ -289,7 +289,7 @@ public class ProcedureToPseudoCodeEmitter
         if (init.InitializeTargets != null && init.InitializeTargets.Count > 0)
             Emit($"INITIALIZE {string.Join(", ", init.InitializeTargets)}");
         else
-            Emit($"INITIALIZE {init.Text ?? "?"}");
+            Emit(init.Text ?? "INITIALIZE");
     }
 
     private void EmitSimple(SimpleStatement simple)

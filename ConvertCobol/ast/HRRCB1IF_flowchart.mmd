@@ -227,7 +227,7 @@ flowchart TD
     F_RCB_RTN --> F_FORM_TITLE
     F_RCB_RTN --> F_FUN_RTN
     F_STOP_RTN --> F_HT_CLOSE
-    F_RCB1_Gd_1_Ev_Msg_Begin_Entry --> F_RCB1_GD_1_EV_MSG_GOTO_CELL
+    F_RCB1_Gd_1_Ev_Msg_Begin_Entry --> F_RCB1_Gd_1_Ev_Msg_Goto_Cell
     F_RCB1_Gd_1_Ev_Msg_Goto_Cell --> F_COLOR_RTN
     F_RCB1_Gd_1_Ev_Msg_Goto_Cell_Mouse --> F_COLOR_RTN
     F_RCB1_Gd_1_Ev_Msg_Paged_Prev --> F_BLANK
@@ -238,10 +238,10 @@ flowchart TD
     F_RCB1_Gd_1_Ev_Msg_Paged_Prevpage --> F_SCREEN_UP
     F_HT_DATA_Ex_Cmd_Close --> Acu_S_HT_DATA_Exit
     F_HT_DATA_Aft_Initdata --> F_HT_DATA_RTN
-    S_HT_DATA_Ex_Other --> F_HT_DATA_EX_CMD_CLOSE
-    F_SHOW_FORM1_RTN --> ACU_S_RCB1_GD_1_CONTENT
-    F_SHOW_FORM2_RTN --> ACU_S_RCB1_GD_1_CONTENT
-    F_SHOW_FORM3_RTN --> ACU_S_RCB1_GD_1_CONTENT
+    S_HT_DATA_Ex_Other --> F_HT_DATA_Ex_Cmd_Close
+    F_SHOW_FORM1_RTN --> Acu_S_RCB1_Gd_1_Content
+    F_SHOW_FORM2_RTN --> Acu_S_RCB1_Gd_1_Content
+    F_SHOW_FORM3_RTN --> Acu_S_RCB1_Gd_1_Content
     F_FUN_RTN --> F_CHK_FORM_RTN
     F_MESG2_RTN --> F_ERR_NOTE
     F_PICB_RTN --> F_999_RTN
